@@ -12,8 +12,11 @@ pub struct OutputConnector<T> {
 }
 
 impl<T: Copy> OutputConnector<T> {
-    pub fn new(name: &str) -> Self{
-        OutputConnector { name: name.to_string(), output: None }
+    pub fn new(name: &str) -> Self {
+        OutputConnector {
+            name: name.to_string(),
+            output: None,
+        }
     }
 
     pub fn name(&self) -> &str {
@@ -30,8 +33,11 @@ pub struct InputConnector<T> {
 }
 
 impl<T: Copy> InputConnector<T> {
-    pub fn new(name: &str) -> Self{
-        InputConnector { name: name.to_string(), input: None }
+    pub fn new(name: &str) -> Self {
+        InputConnector {
+            name: name.to_string(),
+            input: None,
+        }
     }
 
     pub fn name(&self) -> &str {
@@ -179,8 +185,14 @@ impl ControlSystemBuilder {
 
 pub trait ControlBlock {
     fn notify_outputs(&mut self, interconnector: &mut Interconnector) -> Result<()>;
+
     fn notify_inputs(&mut self, interconnector: &mut Interconnector) -> Result<()>;
-    fn step(&mut self) -> Result<()>;
+
+    fn step(&mut self, k: usize) -> Result<()>;
+
+    fn delay(&self) -> usize {
+        0usize
+    }
 }
 
 pub struct ControlSystem {
@@ -192,9 +204,9 @@ impl ControlSystem {
         ControlSystem { blocks: vec![] }
     }
 
-    pub fn step(&mut self) -> Result<()> {
+    pub fn step(&mut self, k: usize) -> Result<()> {
         for block in self.blocks.iter_mut() {
-            block.step()?;
+            block.step(k)?;
         }
 
         Ok(())
