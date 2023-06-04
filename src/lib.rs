@@ -173,8 +173,8 @@ impl ControlSystemBuilder {
     }
 
     pub fn add_block<T: ControlBlock + 'static>(&mut self, mut block: T) -> Result<()> {
-        block.notify_outputs(&mut self.interconnector)?;
-        block.notify_inputs(&mut self.interconnector)?;
+        block.register_outputs(&mut self.interconnector)?;
+        block.register_inputs(&mut self.interconnector)?;
 
         self.control_system.blocks.push(Box::new(block));
         Ok(())
@@ -186,9 +186,9 @@ impl ControlSystemBuilder {
 }
 
 pub trait ControlBlock {
-    fn notify_outputs(&mut self, interconnector: &mut Interconnector) -> Result<()>;
+    fn register_outputs(&mut self, interconnector: &mut Interconnector) -> Result<()>;
 
-    fn notify_inputs(&mut self, interconnector: &mut Interconnector) -> Result<()>;
+    fn register_inputs(&mut self, interconnector: &mut Interconnector) -> Result<()>;
 
     fn step(&mut self, k: usize) -> Result<()>;
 

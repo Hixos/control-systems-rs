@@ -16,13 +16,13 @@ impl<T: Copy> Print<T> {
 }
 
 impl<T: Copy + Display + 'static> ControlBlock for Print<T> {
-    fn notify_inputs(&mut self, interconnector: &mut control_system::Interconnector) -> Result<()> {
+    fn register_inputs(&mut self, interconnector: &mut control_system::Interconnector) -> Result<()> {
         interconnector.register_input(&mut self.i1)?;
         Ok(())
     }
 
     #[allow(unused_variables)]
-    fn notify_outputs(
+    fn register_outputs(
         &mut self,
         interconnector: &mut control_system::Interconnector,
     ) -> Result<()> {

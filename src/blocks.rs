@@ -20,13 +20,13 @@ impl<T: Copy> Add<T> {
 }
 
 impl<T: Copy + Num + 'static> ControlBlock for Add<T> {
-    fn notify_inputs(&mut self, interconnector: &mut Interconnector) -> Result<()> {
+    fn register_inputs(&mut self, interconnector: &mut Interconnector) -> Result<()> {
         interconnector.register_input(&mut self.i1)?;
         interconnector.register_input(&mut self.i2)?;
         Ok(())
     }
 
-    fn notify_outputs(
+    fn register_outputs(
         &mut self,
         interconnector: &mut Interconnector,
     ) -> Result<()> {
@@ -61,11 +61,11 @@ impl<T: Copy> Constant<T> {
 
 impl<T: Copy + Num + 'static> ControlBlock for Constant<T> {
     #[allow(unused_variables)]
-    fn notify_inputs(&mut self, interconnector: &mut Interconnector) -> Result<()> {
+    fn register_inputs(&mut self, interconnector: &mut Interconnector) -> Result<()> {
         Ok(())
     }
 
-    fn notify_outputs(
+    fn register_outputs(
         &mut self,
         interconnector: &mut Interconnector,
     ) -> Result<()> {
@@ -109,12 +109,12 @@ impl<T: Copy, const D: usize> Delay<T, D> {
 }
 
 impl<T: Copy + 'static, const D: usize> ControlBlock for Delay<T, D> {
-    fn notify_inputs(&mut self, interconnector: &mut Interconnector) -> Result<()> {
+    fn register_inputs(&mut self, interconnector: &mut Interconnector) -> Result<()> {
         interconnector.register_input(&mut self.i)?;
         Ok(())
     }
 
-    fn notify_outputs(
+    fn register_outputs(
         &mut self,
         interconnector: &mut Interconnector,
     ) -> Result<()> {
