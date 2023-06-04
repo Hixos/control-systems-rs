@@ -1,12 +1,13 @@
-pub mod iochannel;
 pub mod blocks;
-
+pub mod iochannel;
 
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 
 use anyhow::{anyhow, Result};
 use iochannel::{io_channel, IOChannel, InputReceiver, OutputSender};
+use petgraph::stable_graph::NodeIndex;
+use petgraph::{algo, Graph};
 
 pub struct OutputConnector<T> {
     name: String,
@@ -62,21 +63,117 @@ struct ChannelBundle<T> {
     sender: Option<OutputSender<T>>,
 }
 
-pub struct Interconnector {
+struct BuilderData {
+    graph: Graph<String, String>,
     channels: HashMap<String, ChannelEntry>,
+    blocks: HashMap<NodeIndex, Box<dyn ControlBlock>>,
+
+    produced_signals: HashMap<String, NodeIndex>,
+    consumers: HashMap<NodeIndex, Vec<String>>,
 }
 
-impl Interconnector {
-    fn new() -> Interconnector {
-        Interconnector {
+impl BuilderData {
+    fn new() -> Self {
+        BuilderData {
+            graph: Graph::new(),
+            blocks: HashMap::new(),
             channels: HashMap::new(),
+            produced_signals: HashMap::new(),
+            consumers: HashMap::new(),
+        }
+    }
+}
+
+pub struct ControlSystemBuilder {
+    data: BuilderData,
+}
+
+impl ControlSystemBuilder {
+    pub fn new() -> ControlSystemBuilder {
+        ControlSystemBuilder {
+            data: BuilderData::new(),
         }
     }
 
+    pub fn add_block<T: ControlBlock + 'static>(&mut self, mut block: T) -> Result<()> {
+        let node_index = self.data.graph.add_node(block.name());
+        self.data.consumers.insert(node_index, vec![]);
+
+        {
+            let mut interconnector = Interconnector {
+                data: &mut self.data,
+                block_index: node_index,
+            };
+
+            block.register_outputs(&mut interconnector)?;
+            block.register_inputs(&mut interconnector)?;
+        }
+
+        self.data.blocks.insert(node_index, Box::new(block));
+        Ok(())
+    }
+
+    pub fn build(mut self) -> Result<ControlSystem> {
+        for (cons, vec) in self.data.consumers.iter() {
+            for s in vec {
+                let prod = self.data.produced_signals.get(s);
+                match prod {
+                    Some(prod) => {
+                        if self.data.blocks.get(cons).unwrap().delay() == 0 {
+                            self.data.graph.add_edge(*prod, *cons, s.clone());
+                        }
+                    }
+                    None => {
+                        return Err(anyhow!(format!(
+                            "Signal '{}' is not output from any block!",
+                            s
+                        )));
+                    }
+                }
+            }
+        }
+
+        let ordered = algo::toposort(&self.data.graph, None);
+
+        match ordered {
+            Ok(nodes) => {
+                let mut blocks = vec![];
+                for n in nodes {
+                    blocks.push(self.data.blocks.remove(&n).unwrap());
+                }
+                Ok(ControlSystem{ blocks })
+            }
+            Err(cycle) => {
+                Err(anyhow!(format!("Control system presents a cycle containing Node '{}'. You probably want to break the cycle by adding a delay block.", self.data.graph.node_weight(cycle.node_id()).unwrap())))
+            }
+        }
+    }
+}
+
+pub struct Interconnector<'a> {
+    data: &'a mut BuilderData,
+    block_index: NodeIndex,
+}
+
+impl<'a> Interconnector<'a> {
     pub fn register_output<T: 'static>(&mut self, conn: &mut OutputConnector<T>) -> Result<()> {
+        // Store the fact that we produced this signals
+        let res = self
+            .data
+            .produced_signals
+            .insert(conn.name.clone(), self.block_index);
+
+        if res.is_some() {
+            return Err(anyhow!(format!(
+                "Output signal '{}' already registered",
+                conn.name
+            )));
+        }
+
+        // Actually connect the output to the corresponding input
         let connector_tid = TypeId::of::<T>();
 
-        if !self.channels.contains_key(&conn.name) {
+        if !self.data.channels.contains_key(&conn.name) {
             self.insert_new_channel::<T>(conn.name.clone());
         }
 
@@ -85,7 +182,7 @@ impl Interconnector {
                 tid,
                 has_producer,
                 channel,
-            } = self.channels.get_mut(&conn.name).unwrap();
+            } = self.data.channels.get_mut(&conn.name).unwrap();
             if *tid == connector_tid {
                 let channel = channel.downcast_mut::<ChannelBundle<T>>().unwrap();
 
@@ -112,9 +209,18 @@ impl Interconnector {
     }
 
     pub fn register_input<T: 'static>(&mut self, conn: &mut InputConnector<T>) -> Result<()> {
+        // Save the input name into the BuilderBlockData
+        self.data
+            .consumers
+            .get_mut(&self.block_index)
+            .unwrap()
+            .push(conn.name.clone());
+
+        // Actually connect the input to the corresponding output
+
         let connector_tid = TypeId::of::<T>();
 
-        if !self.channels.contains_key(&conn.name) {
+        if !self.data.channels.contains_key(&conn.name) {
             self.insert_new_channel::<T>(conn.name.clone());
         }
 
@@ -123,7 +229,7 @@ impl Interconnector {
                 tid,
                 has_producer: _,
                 channel,
-            } = self.channels.get_mut(&conn.name).unwrap();
+            } = self.data.channels.get_mut(&conn.name).unwrap();
             if *tid == connector_tid {
                 Ok(channel.downcast_mut::<ChannelBundle<T>>().unwrap())
             } else {
@@ -148,7 +254,7 @@ impl Interconnector {
             sender: Some(sender),
         });
 
-        self.channels.insert(
+        self.data.channels.insert(
             name,
             ChannelEntry {
                 tid: connector_tid,
@@ -159,33 +265,9 @@ impl Interconnector {
     }
 }
 
-pub struct ControlSystemBuilder {
-    control_system: ControlSystem,
-    interconnector: Interconnector,
-}
-
-impl ControlSystemBuilder {
-    pub fn new() -> ControlSystemBuilder {
-        ControlSystemBuilder {
-            control_system: ControlSystem::new(),
-            interconnector: Interconnector::new(),
-        }
-    }
-
-    pub fn add_block<T: ControlBlock + 'static>(&mut self, mut block: T) -> Result<()> {
-        block.register_outputs(&mut self.interconnector)?;
-        block.register_inputs(&mut self.interconnector)?;
-
-        self.control_system.blocks.push(Box::new(block));
-        Ok(())
-    }
-
-    pub fn build(self) -> Result<ControlSystem> {
-        Ok(self.control_system)
-    }
-}
-
 pub trait ControlBlock {
+    fn name(&self) -> String;
+
     fn register_outputs(&mut self, interconnector: &mut Interconnector) -> Result<()>;
 
     fn register_inputs(&mut self, interconnector: &mut Interconnector) -> Result<()>;
@@ -202,10 +284,6 @@ pub struct ControlSystem {
 }
 
 impl ControlSystem {
-    fn new() -> ControlSystem {
-        ControlSystem { blocks: vec![] }
-    }
-
     pub fn step(&mut self, k: usize) -> Result<()> {
         for block in self.blocks.iter_mut() {
             block.step(k)?;

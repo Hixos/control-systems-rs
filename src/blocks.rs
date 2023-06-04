@@ -4,14 +4,16 @@ use num_traits::Num;
 use rbl_circular_buffer::CircularBuffer;
 
 pub struct Add<T> {
+    name: String,
     i1: InputConnector<T>,
     i2: InputConnector<T>,
     o1: OutputConnector<T>,
 }
 
 impl<T: Copy> Add<T> {
-    pub fn new(a_name: &str, b_name: &str, sum_name: &str) -> Self {
+    pub fn new(block_name: &str, a_name: &str, b_name: &str, sum_name: &str) -> Self {
         Add {
+            name: block_name.to_string(),
             i1: InputConnector::new(a_name),
             i2: InputConnector::new(b_name),
             o1: OutputConnector::new(sum_name),
@@ -43,16 +45,22 @@ impl<T: Copy + Num + 'static> ControlBlock for Add<T> {
 
         Ok(())
     }
+
+    fn name(&self) -> String {
+        self.name.clone()
+    }
 }
 
 pub struct Constant<T> {
+    name: String,
     o1: OutputConnector<T>,
     value: T,
 }
 
 impl<T: Copy> Constant<T> {
-    pub fn new(value: T, out_name: &str) -> Self {
+    pub fn new(block_name: &str, value: T, out_name: &str) -> Self {
         Constant {
+            name: block_name.to_string(),
             o1: OutputConnector::new(out_name),
             value,
         }
@@ -79,9 +87,14 @@ impl<T: Copy + Num + 'static> ControlBlock for Constant<T> {
 
         Ok(())
     }
+
+    fn name(&self) -> String {
+        self.name.clone()
+    }
 }
 
 pub struct Delay<T, const D: usize> {
+    name: String,
     i: InputConnector<T>,
     o: OutputConnector<T>,
     initial_value: T,
@@ -89,10 +102,11 @@ pub struct Delay<T, const D: usize> {
 }
 
 impl<T: Copy, const D: usize> Delay<T, D> {
-    pub fn new(initial_value: T, i_name: &str, o_name: &str) -> Self {
+    pub fn new(block_name: &str, initial_value: T, i_name: &str, o_name: &str) -> Self {
         assert!(D > 0, "Delay must be > 0!");
 
         let mut instance = Delay {
+            name: block_name.to_string(),
             i: InputConnector::new(i_name),
             o: OutputConnector::new(o_name),
             initial_value,
@@ -137,5 +151,9 @@ impl<T: Copy + 'static, const D: usize> ControlBlock for Delay<T, D> {
 
     fn delay(&self) -> usize {
         D
+    }
+
+    fn name(&self) -> String {
+        self.name.clone()
     }
 }
