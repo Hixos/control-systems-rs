@@ -1,4 +1,6 @@
 pub mod iochannel;
+pub mod blocks;
+
 
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
