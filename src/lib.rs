@@ -86,12 +86,14 @@ impl BuilderData {
 
 pub struct ControlSystemBuilder {
     data: BuilderData,
+    num_scopes: usize,
 }
 
 impl ControlSystemBuilder {
     pub fn new() -> ControlSystemBuilder {
         ControlSystemBuilder {
             data: BuilderData::new(),
+            num_scopes: 0,
         }
     }
 
@@ -110,6 +112,21 @@ impl ControlSystemBuilder {
         }
 
         self.data.blocks.insert(node_index, Box::new(block));
+        Ok(())
+    }
+
+    pub fn probe<T, F>(&mut self, signal: &str, f: F) -> Result<()>
+    where
+        F: Fn(Option<T>, usize) -> () + 'static,
+        T: Copy + 'static
+    {
+        self.add_block(Probe::new(
+            format!("scope_{}", self.num_scopes).as_str(),
+            signal,
+            f,
+        ))?;
+
+        self.num_scopes += 1;
         Ok(())
     }
 
@@ -290,5 +307,52 @@ impl ControlSystem {
         }
 
         Ok(())
+    }
+}
+
+struct Probe<T, F>
+where
+    F: Fn(Option<T>, usize) -> (),
+{
+    name: String,
+    u: InputConnector<T>,
+    f: F,
+}
+
+impl<T: Copy, F> Probe<T, F>
+where
+    F: Fn(Option<T>, usize) -> (),
+{
+    fn new(block_name: &str, in_name: &str, f: F) -> Self {
+        Probe {
+            name: block_name.to_string(),
+            u: InputConnector::new(in_name),
+            f: f,
+        }
+    }
+}
+
+impl<T: Copy + 'static, F> ControlBlock for Probe<T, F>
+where
+    F: Fn(Option<T>, usize) -> (),
+{
+    fn register_inputs(&mut self, interconnector: &mut Interconnector) -> Result<()> {
+        interconnector.register_input(&mut self.u)?;
+        Ok(())
+    }
+
+    #[allow(unused_variables)]
+    fn register_outputs(&mut self, interconnector: &mut Interconnector) -> Result<()> {
+        Ok(())
+    }
+
+    #[allow(unused_variables)]
+    fn step(&mut self, k: usize) -> Result<()> {
+        (self.f)(self.u.input(), k);
+        Ok(())
+    }
+
+    fn name(&self) -> String {
+        self.name.clone()
     }
 }

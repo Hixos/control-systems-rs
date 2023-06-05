@@ -18,7 +18,10 @@ impl<T: Copy> Print<T> {
 }
 
 impl<T: Copy + Display + 'static> ControlBlock for Print<T> {
-    fn register_inputs(&mut self, interconnector: &mut control_system::Interconnector) -> Result<()> {
+    fn register_inputs(
+        &mut self,
+        interconnector: &mut control_system::Interconnector,
+    ) -> Result<()> {
         interconnector.register_input(&mut self.i1)?;
         Ok(())
     }
@@ -60,6 +63,14 @@ fn main() -> Result<()> {
     builder.add_block(add)?;
     builder.add_block(delay)?;
     builder.add_block(print)?;
+
+    builder.probe("a1", |val: Option<i32>, k| {
+        println!("Watching a1[{}]: {}", k, val.unwrap())
+    })?;
+
+    builder.probe("a2", |val: Option<i32>, k| {
+        println!("Watching a2[{}]: {}", k, val.unwrap())
+    })?;
 
     let mut control_system = builder.build()?;
 
