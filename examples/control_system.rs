@@ -50,12 +50,12 @@ fn main() -> Result<()> {
     //        |          |
     //        \- (z^-1) -/
 
-    let delay = blocks::Delay::<i32, 1>::new("delay", 0, "sum", "a2");
-    let c1 = blocks::Constant::new("c1", 1, "a1");
+    let delay = blocks::Delay::<f32, 1>::new("delay", 0f32, "sum", "a2");
+    let c1 = blocks::Constant::new("c1", 1f32, "a1");
 
-    let add = blocks::Add::<i32>::new("add", "a1", "a2", "sum");
+    let add = blocks::Add::<f32, 2>::new("add", &["a1", "a2"], None,"sum");
 
-    let print = Print::<i32>::new("sum", "sum");
+    let print = Print::<f32>::new("sum", "sum");
 
     let mut builder = ControlSystemBuilder::new();
 
@@ -64,11 +64,11 @@ fn main() -> Result<()> {
     builder.add_block(delay)?;
     builder.add_block(print)?;
 
-    builder.probe("a1", |val: Option<i32>, k| {
+    builder.probe("a1", |val: Option<f32>, k| {
         println!("Watching a1[{}]: {}", k, val.unwrap())
     })?;
 
-    builder.probe("a2", |val: Option<i32>, k| {
+    builder.probe("a2", |val: Option<f32>, k| {
         println!("Watching a2[{}]: {}", k, val.unwrap())
     })?;
 
