@@ -1,48 +1,68 @@
+use crate::{ControlBlock, InputConnector, Interconnector, OutputConnector};
 use anyhow::{anyhow, Result};
-use crate::{ControlBlock, Interconnector, InputConnector, OutputConnector};
-use num_traits::Num;
+use num_traits::{Num, NumAssignOps};
 use rbl_circular_buffer::CircularBuffer;
 
-pub struct Add<T> {
+pub struct Add<T, const N: usize> {
     name: String,
-    i1: InputConnector<T>,
-    i2: InputConnector<T>,
-    o1: OutputConnector<T>,
+    mul: [T; N],
+    u: Vec<InputConnector<T>>,
+    y: OutputConnector<T>,
 }
 
-impl<T: Copy> Add<T> {
-    pub fn new(block_name: &str, a_name: &str, b_name: &str, sum_name: &str) -> Self {
+impl<T, const N: usize> Add<T, N>
+where
+    T: Copy + Num + NumAssignOps,
+{
+    pub fn new(block_name: &str, u_names: &[&str; N], mul: Option<&[T; N]>, y_name: &str) -> Self {
+        assert!(N > 0, "N must be greater than 0!");
+
+        // By default leave inputs unchanged
+        let def = [num_traits::one::<T>(); N];
+
+        let mul = mul.unwrap_or(&def);
+
         Add {
             name: block_name.to_string(),
-            i1: InputConnector::new(a_name),
-            i2: InputConnector::new(b_name),
-            o1: OutputConnector::new(sum_name),
+            mul: mul.to_owned(),
+            u: u_names
+                .iter()
+                .map(|n| InputConnector::<T>::new(n))
+                .collect(),
+            y: OutputConnector::new(y_name),
         }
     }
 }
 
-impl<T: Copy + Num + 'static> ControlBlock for Add<T> {
+impl<T, const N: usize> ControlBlock for Add<T, N>
+where
+    T: Copy + Num + NumAssignOps + 'static,
+{
     fn register_inputs(&mut self, interconnector: &mut Interconnector) -> Result<()> {
-        interconnector.register_input(&mut self.i1)?;
-        interconnector.register_input(&mut self.i2)?;
-        Ok(())
+        self.u.iter_mut().try_for_each(|u| -> Result<()> {
+            interconnector.register_input(u)?;
+            Ok(())
+        })
     }
 
-    fn register_outputs(
-        &mut self,
-        interconnector: &mut Interconnector,
-    ) -> Result<()> {
-        interconnector.register_output(&mut self.o1)?;
+    fn register_outputs(&mut self, interconnector: &mut Interconnector) -> Result<()> {
+        interconnector.register_output(&mut self.y)?;
         Ok(())
     }
 
     #[allow(unused_variables)]
     fn step(&mut self, k: usize) -> Result<()> {
-        let a = self.i1.input().ok_or(anyhow!("Input 'a' not provided!"))?;
-        let b = self.i2.input().ok_or(anyhow!("Input 'b' not provided!"))?;
+        let mut sum = num_traits::zero::<T>();
 
-        self.o1.output(a + b);
+        for (u, &m) in self.u.iter().zip(self.mul.iter()) {
+            sum += m * u.input().ok_or(anyhow!(format!(
+                "No input provided for '{}' in block '{}'",
+                u.name(),
+                self.name()
+            )))?;
+        }
 
+        self.y.output(sum);
         Ok(())
     }
 
@@ -73,10 +93,7 @@ impl<T: Copy + Num + 'static> ControlBlock for Constant<T> {
         Ok(())
     }
 
-    fn register_outputs(
-        &mut self,
-        interconnector: &mut Interconnector,
-    ) -> Result<()> {
+    fn register_outputs(&mut self, interconnector: &mut Interconnector) -> Result<()> {
         interconnector.register_output(&mut self.o1)?;
         Ok(())
     }
@@ -128,10 +145,7 @@ impl<T: Copy + 'static, const D: usize> ControlBlock for Delay<T, D> {
         Ok(())
     }
 
-    fn register_outputs(
-        &mut self,
-        interconnector: &mut Interconnector,
-    ) -> Result<()> {
+    fn register_outputs(&mut self, interconnector: &mut Interconnector) -> Result<()> {
         interconnector.register_output(&mut self.o)?;
         Ok(())
     }
