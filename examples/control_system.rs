@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use anyhow::Result;
-use control_system::{blocks, ControlBlock, ControlSystemBuilder, InputConnector};
+use control_system::{blocks, ControlBlock, ControlSystemBuilder, InputConnector, Prober};
 
 struct Print<T> {
     name: String,
@@ -45,6 +45,14 @@ impl<T: Copy + Display + 'static> ControlBlock for Print<T> {
     }
 }
 
+struct Printer;
+
+impl<T: Display> Prober<T> for Printer {
+    fn probe(&self, signal: &str, v: Option<T>, k: usize) {
+        println!("{}[{}], val: {}", signal, k, v.unwrap());
+    }
+}
+
 fn main() -> Result<()> {
     //  c1 -- ADD ---------- PRINT
     //        |          |
@@ -53,7 +61,7 @@ fn main() -> Result<()> {
     let delay = blocks::Delay::<f32, 1>::new("delay", 0f32, "sum", "a2");
     let c1 = blocks::Constant::new("c1", 1f32, "a1");
 
-    let add = blocks::Add::<f32, 2>::new("add", &["a1", "a2"], None,"sum");
+    let add = blocks::Add::<f32, 2>::new("add", &["a1", "a2"], None, "sum");
 
     let print = Print::<f32>::new("sum", "sum");
 
@@ -64,12 +72,10 @@ fn main() -> Result<()> {
     builder.add_block(delay)?;
     builder.add_block(print)?;
 
-    builder.probe("a1", |val: Option<f32>, k| {
-        println!("Watching a1[{}]: {}", k, val.unwrap())
-    })?;
+    builder.probe::<f32, _>("a1", Printer {})?;
+    builder.fnprobe::<f32, _>("a2", |s, v, k| {
+        println!("{}[{}], val: {} (closure)", s, k, v.unwrap());
 
-    builder.probe("a2", |val: Option<f32>, k| {
-        println!("Watching a2[{}]: {}", k, val.unwrap())
     })?;
 
     let mut control_system = builder.build()?;
