@@ -122,7 +122,7 @@ impl ControlSystemBuilder {
 
     pub fn fnprobe<T, F>(&mut self, signal: &str, f: F) -> Result<()>
     where
-        F: Fn(&str, Option<T>, usize) + 'static,
+        F: Fn(&str, Option<T>, StepInfo) + 'static,
         T: Copy + 'static,
     {
         self.probe(signal, FnProber::new(f))
@@ -143,7 +143,7 @@ impl ControlSystemBuilder {
         Ok(())
     }
 
-    pub fn build(mut self) -> Result<ControlSystem> {
+    pub fn build(mut self, t0: f64) -> Result<ControlSystem> {
         for (cons, vec) in self.data.consumers.iter() {
             for s in vec {
                 let prod = self.data.produced_signals.get(s);
@@ -171,7 +171,7 @@ impl ControlSystemBuilder {
                 for n in nodes {
                     blocks.push(self.data.blocks.remove(&n).unwrap());
                 }
-                Ok(ControlSystem{ blocks })
+                Ok(ControlSystem::new(blocks, t0))
             }
             Err(cycle) => {
                 Err(anyhow!(format!("Control system presents a cycle containing Node '{}'. You probably want to break the cycle by adding a delay block.", self.data.graph.node_weight(cycle.node_id()).unwrap())))
@@ -295,6 +295,12 @@ impl<'a> Interconnector<'a> {
     }
 }
 
+pub struct StepInfo {
+    pub k: usize,
+    pub t: f64,
+    pub dt: f64,
+}
+
 pub trait ControlBlock {
     fn name(&self) -> String;
 
@@ -302,7 +308,7 @@ pub trait ControlBlock {
 
     fn register_inputs(&mut self, interconnector: &mut Interconnector) -> Result<()>;
 
-    fn step(&mut self, k: usize) -> Result<()>;
+    fn step(&mut self, k: StepInfo) -> Result<()>;
 
     fn delay(&self) -> usize {
         0usize
@@ -311,13 +317,30 @@ pub trait ControlBlock {
 
 pub struct ControlSystem {
     blocks: Vec<Box<dyn ControlBlock>>,
+    k: usize,
+    t: f64,
 }
 
 impl ControlSystem {
-    pub fn step(&mut self, k: usize) -> Result<()> {
-        for block in self.blocks.iter_mut() {
-            block.step(k)?;
+    fn new(blocks: Vec<Box<dyn ControlBlock>>, t0: f64) -> Self {
+        ControlSystem {
+            blocks: blocks,
+            k: 0,
+            t: t0
         }
+    }
+
+    pub fn step(&mut self, dt: f64) -> Result<()> {
+        for block in self.blocks.iter_mut() {
+            block.step(StepInfo {
+                k: self.k,
+                t: self.t,
+                dt: dt,
+            })?;
+        }
+
+        self.k += 1;
+        self.t += dt;
 
         Ok(())
     }

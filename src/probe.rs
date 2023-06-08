@@ -1,15 +1,15 @@
 use std::marker::PhantomData;
 
-use crate::{ControlBlock, InputConnector, Interconnector};
+use crate::{ControlBlock, InputConnector, Interconnector, StepInfo};
 use anyhow::Result;
 
 pub trait Prober<T> {
-    fn probe(&self, signal: &str, v: Option<T>, k: usize);
+    fn probe(&self, signal: &str, v: Option<T>, k: StepInfo);
 }
 
 pub(crate) struct FnProber<T, F>
 where
-    F: Fn(&str, Option<T>, usize),
+    F: Fn(&str, Option<T>, StepInfo),
 {
     f: F,
     phantom: PhantomData<T>,
@@ -17,7 +17,7 @@ where
 
 impl<T, F> FnProber<T, F>
 where
-    F: Fn(&str, Option<T>, usize),
+    F: Fn(&str, Option<T>, StepInfo),
 {
     pub(crate) fn new(f: F) -> Self {
         FnProber {
@@ -29,9 +29,9 @@ where
 
 impl<T, F> Prober<T> for FnProber<T, F>
 where
-    F: Fn(&str, Option<T>, usize),
+    F: Fn(&str, Option<T>, StepInfo),
 {
-    fn probe(&self, signal: &str, v: Option<T>, k: usize) {
+    fn probe(&self, signal: &str, v: Option<T>, k: StepInfo) {
         (self.f)(signal, v, k);
     }
 }
@@ -73,7 +73,7 @@ where
     }
 
     #[allow(unused_variables)]
-    fn step(&mut self, k: usize) -> Result<()> {
+    fn step(&mut self, k: StepInfo) -> Result<()> {
         self.p.probe(self.u.name(), self.u.input(), k);
         Ok(())
     }

@@ -1,4 +1,4 @@
-use crate::{ControlBlock, InputConnector, Interconnector, OutputConnector};
+use crate::{ControlBlock, InputConnector, Interconnector, OutputConnector, StepInfo};
 use anyhow::{anyhow, Result};
 use num_traits::{Num, NumAssignOps};
 use rbl_circular_buffer::CircularBuffer;
@@ -51,7 +51,7 @@ where
     }
 
     #[allow(unused_variables)]
-    fn step(&mut self, k: usize) -> Result<()> {
+    fn step(&mut self, k: StepInfo) -> Result<()> {
         let mut sum = num_traits::zero::<T>();
 
         for (u, &m) in self.u.iter().zip(self.mul.iter()) {
@@ -99,7 +99,7 @@ impl<T: Copy + Num + 'static> ControlBlock for Constant<T> {
     }
 
     #[allow(unused_variables)]
-    fn step(&mut self, k: usize) -> Result<()> {
+    fn step(&mut self, k: StepInfo) -> Result<()> {
         self.o1.output(self.value);
 
         Ok(())
@@ -150,9 +150,9 @@ impl<T: Copy + 'static, const D: usize> ControlBlock for Delay<T, D> {
         Ok(())
     }
 
-    fn step(&mut self, k: usize) -> Result<()> {
+    fn step(&mut self, k: StepInfo) -> Result<()> {
         // In this case, "input" always refers to the iteration "k-1" since a delay block will always be executed first
-        if k < D {
+        if k.k < D {
             self.buffer.push(self.initial_value);
         } else {
             self.buffer.push(self.i.input().unwrap());

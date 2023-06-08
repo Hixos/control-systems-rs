@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use anyhow::Result;
-use control_system::{blocks, ControlBlock, ControlSystemBuilder, InputConnector, Prober};
+use control_system::{blocks, ControlBlock, ControlSystemBuilder, InputConnector, Prober, StepInfo};
 
 struct Print<T> {
     name: String,
@@ -35,7 +35,7 @@ impl<T: Copy + Display + 'static> ControlBlock for Print<T> {
     }
 
     #[allow(unused_variables)]
-    fn step(&mut self, k: usize) -> Result<()> {
+    fn step(&mut self, k: StepInfo) -> Result<()> {
         println!("Output: {}", self.i1.input().unwrap());
         Ok(())
     }
@@ -48,8 +48,8 @@ impl<T: Copy + Display + 'static> ControlBlock for Print<T> {
 struct Printer;
 
 impl<T: Display> Prober<T> for Printer {
-    fn probe(&self, signal: &str, v: Option<T>, k: usize) {
-        println!("{}[{}], val: {}", signal, k, v.unwrap());
+    fn probe(&self, signal: &str, v: Option<T>, k: StepInfo) {
+        println!("{}[{}], val: {}", signal, k.k, v.unwrap());
     }
 }
 
@@ -73,15 +73,15 @@ fn main() -> Result<()> {
     builder.add_block(print)?;
 
     builder.probe::<f32, _>("a1", Printer {})?;
-    builder.fnprobe::<f32, _>("a2", |s, v, k| {
-        println!("{}[{}], val: {} (closure)", s, k, v.unwrap());
+    builder.fnprobe::<f32, _>("a2", |s, v, k | {
+        println!("{}[{}], val: {} (closure)", s, k.k, v.unwrap());
 
     })?;
 
-    let mut control_system = builder.build()?;
+    let mut control_system = builder.build(0f64)?;
 
-    for k in 0..10 {
-        control_system.step(k)?; // Prints 1,2,3,...,10
+    for _ in 0..10 {
+        control_system.step(1f64)?; // Prints 1,2,3,...,10
     }
 
     Ok(())
