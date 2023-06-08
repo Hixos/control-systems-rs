@@ -1,5 +1,5 @@
 pub mod blocks;
-pub mod iochannel;
+pub mod iosignal;
 pub mod probe;
 
 pub use probe::Prober;
@@ -10,7 +10,7 @@ use std::any::{Any, TypeId};
 use std::collections::HashMap;
 
 use anyhow::{anyhow, Result};
-use iochannel::{io_channel, IOChannel, InputReceiver, OutputSender};
+use iosignal::{io_signal, IOSignal, InputReceiver, OutputSender};
 use petgraph::stable_graph::NodeIndex;
 use petgraph::{algo, Graph};
 
@@ -57,24 +57,35 @@ impl<T: Copy> InputConnector<T> {
     }
 }
 
-struct ChannelEntry {
-    tid: TypeId,
+struct SignalData {
+    /// Does the signal has someone who produces it?
     has_producer: bool,
-    channel: Box<dyn Any>,
+    /// TypeId for data type carried by a signal
+    tid: TypeId,
+    /// Box containing Signal<T> with artbitrary T
+    signal: Box<dyn Any>,
 }
 
-struct ChannelBundle<T> {
-    channel: IOChannel<T>,
+struct Signal<T> {
+    signal: IOSignal<T>,
     sender: Option<OutputSender<T>>,
 }
 
 struct BuilderData {
+    /// Graph representing input-output relationships between every block.
+    /// (Graph<block_name, signal_name>)
     graph: Graph<String, String>,
-    channels: HashMap<String, ChannelEntry>,
+    /// Map of signals by their name
+    signals: HashMap<String, SignalData>,
+
+    /// Map of blocks in the control system by their node id in the graph
     blocks: HashMap<NodeIndex, Box<dyn ControlBlock>>,
 
+    /// Map associating every signal with its producer
     produced_signals: HashMap<String, NodeIndex>,
-    consumers: HashMap<NodeIndex, Vec<String>>,
+
+    /// Map associating every block to the signals it receives as an input
+    consumed_signals: HashMap<NodeIndex, Vec<String>>,
 }
 
 impl BuilderData {
@@ -82,9 +93,9 @@ impl BuilderData {
         BuilderData {
             graph: Graph::new(),
             blocks: HashMap::new(),
-            channels: HashMap::new(),
+            signals: HashMap::new(),
             produced_signals: HashMap::new(),
-            consumers: HashMap::new(),
+            consumed_signals: HashMap::new(),
         }
     }
 }
@@ -103,8 +114,22 @@ impl ControlSystemBuilder {
     }
 
     pub fn add_block<T: ControlBlock + 'static>(&mut self, mut block: T) -> Result<()> {
+        if self
+            .data
+            .graph
+            .node_weights()
+            .filter(|&p| p == &block.name())
+            .count()
+            > 0
+        {
+            return Err(anyhow!(format!(
+                "A block with name '{}' already exists",
+                block.name()
+            )));
+        }
+
         let node_index = self.data.graph.add_node(block.name());
-        self.data.consumers.insert(node_index, vec![]);
+        self.data.consumed_signals.insert(node_index, vec![]);
 
         {
             let mut interconnector = Interconnector {
@@ -116,6 +141,7 @@ impl ControlSystemBuilder {
             block.register_inputs(&mut interconnector)?;
         }
 
+        // Move block into data.blocks
         self.data.blocks.insert(node_index, Box::new(block));
         Ok(())
     }
@@ -144,7 +170,7 @@ impl ControlSystemBuilder {
     }
 
     pub fn build(mut self, t0: f64) -> Result<ControlSystem> {
-        for (cons, vec) in self.data.consumers.iter() {
+        for (cons, vec) in self.data.consumed_signals.iter() {
             for s in vec {
                 let prod = self.data.produced_signals.get(s);
                 match prod {
@@ -203,18 +229,18 @@ impl<'a> Interconnector<'a> {
         // Actually connect the output to the corresponding input
         let connector_tid = TypeId::of::<T>();
 
-        if !self.data.channels.contains_key(&conn.name) {
+        if !self.data.signals.contains_key(&conn.name) {
             self.insert_new_channel::<T>(conn.name.clone());
         }
 
         let channel = {
-            let ChannelEntry {
+            let SignalData {
                 tid,
                 has_producer,
-                channel,
-            } = self.data.channels.get_mut(&conn.name).unwrap();
+                signal: channel,
+            } = self.data.signals.get_mut(&conn.name).unwrap();
             if *tid == connector_tid {
-                let channel = channel.downcast_mut::<ChannelBundle<T>>().unwrap();
+                let channel = channel.downcast_mut::<Signal<T>>().unwrap();
 
                 if channel.sender.is_some() {
                     *has_producer = false;
@@ -241,7 +267,7 @@ impl<'a> Interconnector<'a> {
     pub fn register_input<T: 'static>(&mut self, conn: &mut InputConnector<T>) -> Result<()> {
         // Save the input name into the BuilderBlockData
         self.data
-            .consumers
+            .consumed_signals
             .get_mut(&self.block_index)
             .unwrap()
             .push(conn.name.clone());
@@ -250,18 +276,18 @@ impl<'a> Interconnector<'a> {
 
         let connector_tid = TypeId::of::<T>();
 
-        if !self.data.channels.contains_key(&conn.name) {
+        if !self.data.signals.contains_key(&conn.name) {
             self.insert_new_channel::<T>(conn.name.clone());
         }
 
         let channel = {
-            let ChannelEntry {
+            let SignalData {
                 tid,
                 has_producer: _,
-                channel,
-            } = self.data.channels.get_mut(&conn.name).unwrap();
+                signal: channel,
+            } = self.data.signals.get_mut(&conn.name).unwrap();
             if *tid == connector_tid {
-                Ok(channel.downcast_mut::<ChannelBundle<T>>().unwrap())
+                Ok(channel.downcast_mut::<Signal<T>>().unwrap())
             } else {
                 Err(anyhow!(format!(
                     "Trying to re-register output singal '{}' with a different type ({:?} -> {:?})",
@@ -270,7 +296,7 @@ impl<'a> Interconnector<'a> {
             }
         }?;
 
-        conn.input = Some(channel.channel.new_input_receiver());
+        conn.input = Some(channel.signal.new_input_receiver());
 
         Ok(())
     }
@@ -278,18 +304,18 @@ impl<'a> Interconnector<'a> {
     fn insert_new_channel<T: 'static>(&mut self, name: String) {
         let connector_tid = TypeId::of::<T>();
 
-        let (channel, sender) = io_channel();
-        let bundle: Box<ChannelBundle<T>> = Box::new(ChannelBundle {
-            channel,
+        let (channel, sender) = io_signal();
+        let bundle: Box<Signal<T>> = Box::new(Signal {
+            signal: channel,
             sender: Some(sender),
         });
 
-        self.data.channels.insert(
+        self.data.signals.insert(
             name,
-            ChannelEntry {
+            SignalData {
                 tid: connector_tid,
                 has_producer: false,
-                channel: bundle,
+                signal: bundle,
             },
         );
     }
@@ -326,7 +352,7 @@ impl ControlSystem {
         ControlSystem {
             blocks: blocks,
             k: 0,
-            t: t0
+            t: t0,
         }
     }
 
