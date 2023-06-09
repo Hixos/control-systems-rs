@@ -5,9 +5,12 @@ pub mod probe;
 pub use probe::Prober;
 
 use probe::{FnProber, Probe};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
+use std::io;
 
 use anyhow::{anyhow, Result};
 use iosignal::{io_signal, IOSignal, InputReceiver, OutputSender};
@@ -327,6 +330,23 @@ pub struct StepInfo {
     pub dt: f64,
 }
 
+pub fn save_param_helper<T>(t: T) -> Option<serde_yaml::Value>
+where
+    T: Serialize + Clone,
+{
+    Some(serde_yaml::to_value(t.clone()).unwrap())
+}
+
+pub fn load_param_helper<T>(value: Option<serde_yaml::Value>) -> Result<T>
+where
+    T: DeserializeOwned,
+{
+    match value {
+        Some(value) => serde_yaml::from_value::<T>(value.to_owned()).map_err(|e| anyhow!(e)),
+        None => Err(anyhow!("Could not load parameters: None value")),
+    }
+}
+
 pub trait ControlBlock {
     fn name(&self) -> String;
 
@@ -335,6 +355,14 @@ pub trait ControlBlock {
     fn register_inputs(&mut self, interconnector: &mut Interconnector) -> Result<()>;
 
     fn step(&mut self, k: StepInfo) -> Result<()>;
+
+    fn save_params(&self) -> Option<serde_yaml::Value> {
+        None
+    }
+
+    fn load_params(&mut self, _value: Option<serde_yaml::Value>) -> Result<()> {
+        Ok(())
+    }
 
     fn delay(&self) -> usize {
         0usize
@@ -354,6 +382,45 @@ impl ControlSystem {
             k: 0,
             t: t0,
         }
+    }
+
+    pub fn load_params<R: io::Read>(&mut self, reader: R, continue_on_failure: bool) -> Result<()> {
+        let root: serde_yaml::Value = serde_yaml::from_reader(reader)?;
+
+        for b in self.blocks.iter_mut() {
+            let res = b.load_params(root.get(b.name()).cloned());
+            match res {
+                Ok(_) => {}
+                Err(e) => {
+                    if continue_on_failure {
+                        println!(
+                            "Could not deserialize parameters for block '{}'. Using default parameters. (Error: {})",
+                            b.name(), e
+                        );
+                    } else {
+                        return Err(e);
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn save_params<W: io::Write>(&self, writer: W) -> Result<()> {
+        let mut root = serde_yaml::Value::Mapping(serde_yaml::Mapping::new());
+
+        for b in &mut self.blocks.iter() {
+            match b.save_params() {
+                Some(v) => {
+                    root[b.name()] = v;
+                }
+                None => {}
+            }
+        }
+
+        serde_yaml::to_writer(writer, &root)?;
+
+        Ok(())
     }
 
     pub fn step(&mut self, dt: f64) -> Result<()> {

@@ -1,7 +1,9 @@
-use std::fmt::Display;
+use std::{fmt::Display, fs::File};
 
 use anyhow::Result;
-use control_system::{blocks, ControlBlock, ControlSystemBuilder, InputConnector, Prober, StepInfo};
+use control_system::{
+    blocks, ControlBlock, ControlSystemBuilder, InputConnector, Prober, StepInfo,
+};
 
 struct Print<T> {
     name: String,
@@ -73,16 +75,26 @@ fn main() -> Result<()> {
     builder.add_block(print)?;
 
     builder.probe::<f32, _>("a1", Printer {})?;
-    builder.fnprobe::<f32, _>("a2", |s, v, k | {
+    builder.fnprobe::<f32, _>("a2", |s, v, k| {
         println!("{}[{}], val: {} (closure)", s, k.k, v.unwrap());
-
     })?;
 
     let mut control_system = builder.build(0f64)?;
 
+    let filename = "parameters.yaml";
+    match File::open(filename) {
+        Ok(file) => {
+            control_system.load_params(file, true)?;
+        }
+        Err(_) => {} // Load default parameters
+    }
+
     for _ in 0..10 {
         control_system.step(1f64)?; // Prints 1,2,3,...,10
     }
+
+    let file = File::create(filename)?;
+    control_system.save_params(file)?;
 
     Ok(())
 }

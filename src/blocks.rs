@@ -1,12 +1,14 @@
-use crate::{ControlBlock, InputConnector, Interconnector, OutputConnector, StepInfo};
+use crate::{ControlBlock, InputConnector, Interconnector, OutputConnector, StepInfo, load_param_helper, save_param_helper};
 use anyhow::{anyhow, Result};
+use arrayvec::ArrayVec;
 use num_traits::{Num, NumAssignOps};
 use rbl_circular_buffer::CircularBuffer;
+use serde::{de::DeserializeOwned, Serialize};
 
 pub struct Add<T, const N: usize> {
     name: String,
-    mul: [T; N],
-    u: Vec<InputConnector<T>>,
+    mul: ArrayVec<T, N>,
+    u: ArrayVec<InputConnector<T>, N>,
     y: OutputConnector<T>,
 }
 
@@ -24,7 +26,7 @@ where
 
         Add {
             name: block_name.to_string(),
-            mul: mul.to_owned(),
+            mul: ArrayVec::from(*mul),
             u: u_names
                 .iter()
                 .map(|n| InputConnector::<T>::new(n))
@@ -34,9 +36,9 @@ where
     }
 }
 
-impl<T, const N: usize> ControlBlock for Add<T, N>
+impl<'de, T, const N: usize> ControlBlock for Add<T, N>
 where
-    T: Copy + Num + NumAssignOps + 'static,
+    T: Copy + Num + NumAssignOps + Serialize + DeserializeOwned + 'static,
 {
     fn register_inputs(&mut self, interconnector: &mut Interconnector) -> Result<()> {
         self.u.iter_mut().try_for_each(|u| -> Result<()> {
@@ -69,6 +71,15 @@ where
     fn name(&self) -> String {
         self.name.clone()
     }
+
+    fn load_params(&mut self, _value: Option<serde_yaml::Value>) -> Result<()> {
+        self.mul = load_param_helper(_value)?;
+        Ok(())
+    }
+
+    fn save_params(&self) -> Option<serde_yaml::Value> {
+        save_param_helper(self.mul.clone())
+    }
 }
 
 pub struct Constant<T> {
@@ -87,7 +98,10 @@ impl<T: Copy> Constant<T> {
     }
 }
 
-impl<T: Copy + Num + 'static> ControlBlock for Constant<T> {
+impl<T> ControlBlock for Constant<T>
+where
+    T: Copy + Num + NumAssignOps + Serialize + DeserializeOwned + 'static,
+{
     #[allow(unused_variables)]
     fn register_inputs(&mut self, interconnector: &mut Interconnector) -> Result<()> {
         Ok(())
@@ -107,6 +121,15 @@ impl<T: Copy + Num + 'static> ControlBlock for Constant<T> {
 
     fn name(&self) -> String {
         self.name.clone()
+    }
+
+    fn load_params(&mut self, _value: Option<serde_yaml::Value>) -> Result<()> {
+        self.value = load_param_helper(_value)?;
+        Ok(())
+    }
+
+    fn save_params(&self) -> Option<serde_yaml::Value> {
+        save_param_helper(self.value)
     }
 }
 
