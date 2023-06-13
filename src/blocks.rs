@@ -198,7 +198,7 @@ impl<T: Copy + 'static, const D: usize> ControlBlock for Delay<T, D> {
 
 /// A block whose output is a value obtained by calling a provided function each step
 /// 
-struct Generator<T, F>
+pub struct Generator<T, F>
 where
     T: Copy,
     F: Fn(StepInfo) -> T,
@@ -214,7 +214,7 @@ where
     T: Copy,
     F: Fn(StepInfo) -> T,
 {
-    fn new(name: &str, y_name: &str, f: F) -> Self {
+    pub fn new(name: &str, y_name: &str, f: F) -> Self {
         Generator {
             name: name.to_string(),
             y: OutputConnector::new(y_name),
