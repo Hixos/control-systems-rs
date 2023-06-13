@@ -194,3 +194,56 @@ impl<T: Copy + 'static, const D: usize> ControlBlock for Delay<T, D> {
         self.name.clone()
     }
 }
+
+
+/// A block whose output is a value obtained by calling a provided function each step
+/// 
+struct Generator<T, F>
+where
+    T: Copy,
+    F: Fn(StepInfo) -> T,
+{
+    name: String,
+    y: OutputConnector<T>,
+
+    f: F,
+}
+
+impl<T, F> Generator<T, F>
+where
+    T: Copy,
+    F: Fn(StepInfo) -> T,
+{
+    fn new(name: &str, y_name: &str, f: F) -> Self {
+        Generator {
+            name: name.to_string(),
+            y: OutputConnector::new(y_name),
+            f: f,
+        }
+    }
+}
+
+impl<T, F> ControlBlock for Generator<T, F>
+where
+    T: Copy + 'static,
+    F: Fn(StepInfo) -> T,
+{
+    #[allow(unused_variables)]
+    fn register_inputs(&mut self, interconnector: &mut Interconnector) -> Result<()> {
+        Ok(())
+    }
+
+    fn register_outputs(&mut self, interconnector: &mut Interconnector) -> Result<()> {
+        interconnector.register_output(&mut self.y)
+    }
+
+    #[allow(unused_variables)]
+    fn step(&mut self, k: StepInfo) -> Result<()> {
+        self.y.output((self.f)(k));
+        Ok(())
+    }
+
+    fn name(&self) -> String {
+        self.name.clone()
+    }
+}
