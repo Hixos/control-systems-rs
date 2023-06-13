@@ -35,6 +35,6 @@ impl ODESolver<f64> for ForwardEuler
     where
         F: Fn(f64, SVector<f64, D>) -> SVector<f64, D>,
     {
-        f(t0, y0) * dt
+        y0 + f(t0, y0) * dt
     }
 }
