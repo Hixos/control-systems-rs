@@ -1,6 +1,7 @@
 pub mod blocks;
 pub mod iosignal;
 pub mod probe;
+pub mod numeric;
 
 pub use probe::Prober;
 
