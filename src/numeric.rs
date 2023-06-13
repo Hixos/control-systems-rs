@@ -25,3 +25,16 @@ impl ODESolver<f64> for RungeKutta4
         y0 + (k1 + 2f64*k2 + 2f64*k3 + k4) * dt / 6f64
     }
 }
+
+
+pub struct ForwardEuler;
+
+impl ODESolver<f64> for ForwardEuler
+{
+    fn solve<const D: usize, F>(f: F, t0: f64, dt: f64, y0: SVector<f64, D>) -> SVector<f64, D>
+    where
+        F: Fn(f64, SVector<f64, D>) -> SVector<f64, D>,
+    {
+        f(t0, y0) * dt
+    }
+}
