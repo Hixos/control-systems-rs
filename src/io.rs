@@ -98,8 +98,12 @@ where
         Ok(())
     }
 
-    pub fn get_signal(&self) -> Option<AnySignal> {
-        self.signal.clone()
+    // pub fn get_signal(&self) -> Option<AnySignal> {
+    //     self.signal.clone()
+    // }
+
+    pub fn get_signal_mut(&mut self) -> &mut Option<AnySignal> {
+        &mut self.signal
     }
 }
 
@@ -131,7 +135,7 @@ impl<T> Output<T>
 where
     T: 'static,
 {
-    pub fn get_signal(&self) -> AnySignal {
-        self.signal.clone()
+    pub fn get_signal_mut(&mut self) -> &mut AnySignal {
+        &mut self.signal
     }
 }

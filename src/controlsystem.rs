@@ -60,6 +60,9 @@ impl ControlSystemBuilder {
 
     pub fn build(mut self) -> Result<ControlSystem> {
         for (name, data) in self.blocks.iter_mut() {
+
+            let mut input_signals = data.block.input_signals();
+
             for (signal, input) in data.registered_inputs.iter() {
                 let signal = self.signals.get(signal).ok_or(anyhow!(
                     "Could not connect input '{}/{}': No signal named '{}'",
@@ -68,7 +71,7 @@ impl ControlSystemBuilder {
                     signal
                 ))?;
 
-                data.block.connect_input(input, signal)?;
+                **input_signals.get_mut(input).unwrap() = Some(signal.clone());
             }
         }
 
@@ -104,6 +107,7 @@ impl ControlSystemBuilder {
         block_data: &mut BlockData,
         output_connections: &[(&str, &str)],
     ) -> Result<()> {
+        let block_name = block_data.block.name();
         let mut output_signals = block_data.block.output_signals();
 
         for (port, signal) in output_connections.iter() {
@@ -111,20 +115,20 @@ impl ControlSystemBuilder {
                 // A signal with the same name is already produced by another output
                 return Err(anyhow!(
                     "Cannot connect output '{}/{}': Signal '{}' already has a producer!",
-                    block_data.block.name(),
+                    block_name.clone(),
                     port,
                     signal
                 ));
             } else {
                 self.signals.insert(
                     signal.to_string(),
-                    output_signals
+                    (*(output_signals
                         .get(*port)
                         .ok_or(anyhow!(
                             "No output port named '{}' in block '{}'",
                             port,
-                            block_data.block.name()
-                        ))?
+                            block_name.clone()
+                        ))?))
                         .clone(),
                 );
                 block_data
@@ -140,7 +144,7 @@ impl ControlSystemBuilder {
             Err(anyhow!(
                 "Output ports {:?} of block '{}' were not connected",
                 output_signals.keys(),
-                block_data.block.name()
+                block_name.clone()
             ))
         }
     }

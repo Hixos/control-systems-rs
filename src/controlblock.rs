@@ -5,10 +5,8 @@ use crate::io::AnySignal;
 pub trait BlockIO {
     fn name(&self) -> String;
 
-    fn connect_input(&mut self, name: &str, signal: &AnySignal) -> Result<()>;
-
-    fn input_signals(&self) -> HashMap<String, Option<AnySignal>>;
-    fn output_signals(&self) -> HashMap<String, AnySignal>;
+    fn input_signals(&mut self) -> HashMap<String, &mut Option<AnySignal>>;
+    fn output_signals(&mut self) -> HashMap<String, &mut AnySignal>;
 }
 
 pub trait Block : BlockIO {

@@ -4,7 +4,6 @@ use crate::{
     controlblock::{Block, BlockIO},
     io::{AnySignal, Input, Output},
 };
-use anyhow::{anyhow, Result};
 
 pub struct Constant {
     name: String,
@@ -25,23 +24,16 @@ impl BlockIO for Constant {
         self.name.clone()
     }
 
-    fn connect_input(&mut self, _name: &str, _signal: &AnySignal) -> Result<()> {
-        #![allow(clippy::match_single_binding)]
-        match _name {
-            _ => Err(anyhow!("No input named {} in block {}", _name, self.name())),
-        }
-    }
-
-    fn input_signals(&self) -> std::collections::HashMap<String, Option<AnySignal>> {
+    fn input_signals(&mut self) -> std::collections::HashMap<String, &mut Option<AnySignal>> {
         #![allow(unused_mut, clippy::let_and_return)]
         let mut hm = HashMap::new();
         hm
     }
 
-    fn output_signals(&self) -> HashMap<String, AnySignal> {
+    fn output_signals(&mut self) -> HashMap<String, &mut AnySignal> {
         #![allow(unused_mut)]
         let mut hm = HashMap::new();
-        hm.insert("y".to_string(), self.y.get_signal());
+        hm.insert("y".to_string(), self.y.get_signal_mut());
         hm
     }
 }
@@ -75,27 +67,18 @@ impl BlockIO for Add {
         self.name.to_string()
     }
 
-    fn connect_input(&mut self, _name: &str, _signal: &AnySignal) -> Result<()> {
-        #![allow(clippy::match_single_binding)]
-        match _name {
-            "u1" => self.u1.connect(_signal),
-            "u2" => self.u2.connect(_signal),
-            _ => Err(anyhow!("No input named {} in block {}", _name, self.name())),
-        }
-    }
-
-    fn input_signals(&self) -> std::collections::HashMap<String, Option<AnySignal>> {
+    fn input_signals(&mut self) -> std::collections::HashMap<String, &mut Option<AnySignal>> {
         #![allow(unused_mut)]
         let mut hm = HashMap::new();
-        hm.insert("u1".to_string(), self.u1.get_signal());
-        hm.insert("u2".to_string(), self.u2.get_signal());
+        hm.insert("u1".to_string(), self.u1.get_signal_mut());
+        hm.insert("u2".to_string(), self.u2.get_signal_mut());
         hm
     }
 
-    fn output_signals(&self) -> HashMap<String, AnySignal> {
+    fn output_signals(&mut self) -> HashMap<String, &mut AnySignal> {
         #![allow(unused_mut)]
         let mut hm = HashMap::new();
-        hm.insert("y".to_string(), self.y.get_signal());
+        hm.insert("y".to_string(), self.y.get_signal_mut());
         hm
     }
 }
@@ -126,22 +109,14 @@ impl BlockIO for Print {
         "print".to_string()
     }
 
-    fn connect_input(&mut self, _name: &str, _signal: &AnySignal) -> Result<()> {
-        #![allow(clippy::match_single_binding)]
-        match _name {
-            "u" => self.u.connect(_signal),
-            _ => Err(anyhow!("No input named {} in block {}", _name, self.name())),
-        }
-    }
-
-    fn input_signals(&self) -> std::collections::HashMap<String, Option<AnySignal>> {
+    fn input_signals(&mut self) -> std::collections::HashMap<String, &mut Option<AnySignal>> {
         #![allow(unused_mut)]
         let mut hm = HashMap::new();
-        hm.insert("u".to_string(), self.u.get_signal());
+        hm.insert("u".to_string(), self.u.get_signal_mut());
         hm
     }
 
-    fn output_signals(&self) -> HashMap<String, AnySignal> {
+    fn output_signals(&mut self) -> HashMap<String, &mut AnySignal> {
         #![allow(unused_mut)]
         let mut hm = HashMap::new();
         hm

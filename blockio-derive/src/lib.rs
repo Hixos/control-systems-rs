@@ -1,14 +1,14 @@
 use core::panic;
 
-use proc_macro2::{TokenStream, TokenTree};
+use proc_macro2::{TokenStream, TokenTree, Ident};
 use quote::quote;
 use syn::{parse_macro_input, Attribute, Data, DeriveInput, Fields, Meta, MetaList};
 
 #[derive(Clone, Debug)]
 enum BlockIOAttribute {
     Name,
-    Input(Option<String>),
-    Output(Option<String>),
+    Input { name: Option<String>, is_arr: bool },
+    Output { name: Option<String>, is_arr: bool },
 }
 
 impl BlockIOAttribute {
@@ -46,7 +46,9 @@ impl BlockIOAttribute {
         #[derive(Clone, Copy)]
         enum IOType {
             Input,
+            InputArr,
             Output,
+            OutputArr,
         }
 
         #[derive(PartialEq, Eq, Clone, Copy)]
@@ -67,11 +69,43 @@ impl BlockIOAttribute {
                         "block_name" => set(&mut out, BlockIOAttribute::Name),
                         "input" => {
                             state = State::IOField(IOType::Input, IOFieldState::Sep);
-                            set(&mut out, BlockIOAttribute::Input(None));
+                            set(
+                                &mut out,
+                                BlockIOAttribute::Input {
+                                    name: None,
+                                    is_arr: false,
+                                },
+                            );
                         }
                         "output" => {
                             state = State::IOField(IOType::Output, IOFieldState::Sep);
-                            set(&mut out, BlockIOAttribute::Output(None));
+                            set(
+                                &mut out,
+                                BlockIOAttribute::Output {
+                                    name: None,
+                                    is_arr: false,
+                                },
+                            );
+                        }
+                        "input_arr" => {
+                            state = State::IOField(IOType::InputArr, IOFieldState::Sep);
+                            set(
+                                &mut out,
+                                BlockIOAttribute::Input {
+                                    name: None,
+                                    is_arr: true,
+                                },
+                            );
+                        }
+                        "output_arr" => {
+                            state = State::IOField(IOType::OutputArr, IOFieldState::Sep);
+                            set(
+                                &mut out,
+                                BlockIOAttribute::Output {
+                                    name: None,
+                                    is_arr: true,
+                                },
+                            );
                         }
                         _ => panic!("Unrecognized identifier in 'blockio' attribute: {}", ident),
                     },
@@ -120,10 +154,28 @@ impl BlockIOAttribute {
                         IOFieldState::Literal => match token {
                             TokenTree::Literal(literal) => match io {
                                 IOType::Input => {
-                                    out = Some(BlockIOAttribute::Input(Some(literal.to_string())))
+                                    out = Some(BlockIOAttribute::Input {
+                                        name: Some(literal.to_string()),
+                                        is_arr: false,
+                                    })
                                 }
                                 IOType::Output => {
-                                    out = Some(BlockIOAttribute::Output(Some(literal.to_string())))
+                                    out = Some(BlockIOAttribute::Output {
+                                        name: Some(literal.to_string()),
+                                        is_arr: false,
+                                    })
+                                }
+                                IOType::InputArr => {
+                                    out = Some(BlockIOAttribute::Input {
+                                        name: Some(literal.to_string()),
+                                        is_arr: true,
+                                    })
+                                }
+                                IOType::OutputArr => {
+                                    out = Some(BlockIOAttribute::Output {
+                                        name: Some(literal.to_string()),
+                                        is_arr: true,
+                                    })
                                 }
                             },
                             _ => panic!(
@@ -158,10 +210,24 @@ fn parse_attributes(attrs: &[Attribute]) -> Option<BlockIOAttribute> {
     out
 }
 
+fn quote_map_insert(ident: Ident, name: String, is_arr: bool) -> TokenStream {
+    if is_arr {
+        quote! {
+            for (i, s) in self.#ident.iter_mut().enumerate() {
+                hm.insert(format!("{}{}", #name, i + 1).to_string(), s.get_signal_mut());
+            }
+        }
+    }else{
+        quote! {
+            hm.insert(#name.to_string(), self.#ident.get_signal_mut());
+        }
+    }
+}
+
 #[proc_macro_derive(BlockIO, attributes(blockio))]
 pub fn derive(tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let ast = parse_macro_input!(tokens as DeriveInput);
-
+    
     let datastruct = match ast.data {
         Data::Struct(s) => s,
         Data::Enum(..) => panic!("Enums are not supported!"),
@@ -174,7 +240,6 @@ pub fn derive(tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
     };
 
     let mut name: Option<TokenStream> = None;
-    let mut input_bindings: Vec<TokenStream> = vec![];
     let mut input_map: Vec<TokenStream> = vec![];
     let mut output_map: Vec<TokenStream> = vec![];
 
@@ -193,54 +258,41 @@ pub fn derive(tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
                         }
                     });
                 }
-                BlockIOAttribute::Input(name) => {
+                BlockIOAttribute::Input { name, is_arr } => {
                     let name = name.unwrap_or(ident.to_string());
-                    input_bindings.push(quote! {
-                        #name => self.#ident.connect(_signal),
-                    });
-
-                    input_map.push(quote! {
-                        hm.insert(#name.to_string(), self.#ident.get_signal());
-                    });
+                    
+                    input_map.push(quote_map_insert(ident, name, is_arr));
                 }
-                BlockIOAttribute::Output(name) => {
+                BlockIOAttribute::Output { name, is_arr } => {
                     let name = name.unwrap_or(ident.to_string());
-                    output_map.push(quote! {
-                        hm.insert(#name.to_string(), self.#ident.get_signal());
-                    });
+                    output_map.push(quote_map_insert(ident, name, is_arr));
                 }
             }
         }
     }
 
     let struct_ident = ast.ident;
-    let tokens = quote!{
-        impl BlockIO for #struct_ident {
+    let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
+
+    let tokens = quote! {
+        impl #impl_generics BlockIO for #struct_ident #ty_generics #where_clause {
             #name
 
-            fn connect_input(&mut self, _name: &str, _signal: &::control_system::io::AnySignal) -> ::anyhow::Result<()> {
-                #![allow(clippy::match_single_binding)]
-                match _name {
-                    #( #input_bindings )*
-                    _ => Err(::anyhow::anyhow!("No input named {} in block {}", _name, self.name())),
-                }
-            }
-
-            fn input_signals(&self) -> ::std::collections::HashMap<::std::string::String, ::std::option::Option<::control_system::io::AnySignal>> {
+            fn input_signals(&mut self) -> ::std::collections::HashMap<::std::string::String, &mut ::std::option::Option<::control_system::io::AnySignal>> {
                 #![allow(unused_mut, clippy::let_and_return)]
                 let mut hm = ::std::collections::HashMap::new();
-            
+
                 #( #input_map )*
-            
+
                 hm
             }
-            
-            fn output_signals(&self) -> ::std::collections::HashMap<::std::string::String, ::control_system::io::AnySignal> {
+
+            fn output_signals(&mut self) -> ::std::collections::HashMap<::std::string::String, &mut ::control_system::io::AnySignal> {
                 #![allow(unused_mut, clippy::let_and_return)]
                 let mut hm = ::std::collections::HashMap::new();
-            
+
                 #( #output_map )*
-            
+
                 hm
             }
         }
