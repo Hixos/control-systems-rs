@@ -14,7 +14,7 @@ impl<T: Copy> Print<T> {
     fn new(block_name: &str, in_name: &str) -> Self {
         Print {
             name: block_name.to_string(),
-            i1: InputConnector::new(in_name),
+            i1: InputConnector::default(),
         }
     }
 }
@@ -24,7 +24,7 @@ impl<T: Copy + Display + 'static> ControlBlock for Print<T> {
         &mut self,
         interconnector: &mut control_system::Interconnector,
     ) -> Result<()> {
-        interconnector.register_input(&mut self.i1)?;
+        interconnector.register_input(&mut self.i1, &self.name, "u")?;
         Ok(())
     }
 
@@ -60,10 +60,10 @@ fn main() -> Result<()> {
     //        |          |
     //        \- (z^-1) -/
 
-    let delay = blocks::Delay::<f32, 1>::new("delay", 0f32, "sum", "a2");
-    let c1 = blocks::Constant::new("c1", 1f32, "a1");
+    let delay = blocks::Delay::<f32, 1>::new("delay", 0f32);
+    let c1 = blocks::Constant::new("c1", 1f32);
 
-    let add = blocks::Add::<f32, 2>::new("add", &["a1", "a2"], None, "sum");
+    let add = blocks::Add::<f32, 2>::new("add", None);
 
     let print = Print::<f32>::new("sum", "sum");
 
