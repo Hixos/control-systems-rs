@@ -1,5 +1,5 @@
 [package]
-name = "control_system"
+name = "control-system"
 version = "0.1.0"
 edition = "2021"
 
@@ -8,5 +8,11 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.79"
 petgraph = "0.6.4"
-blockio-derive = { path = "blockio-derive" }
-arrayinit = "0.1.1"
+control-system-derive = { path = "control-system-derive" }
+
+
+[workspace]
+members = [
+    "control-system-derive",
+    "control-system-blocks",
+]

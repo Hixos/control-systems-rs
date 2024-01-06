@@ -214,12 +214,12 @@ fn quote_map_insert(ident: Ident, name: String, is_arr: bool) -> TokenStream {
     if is_arr {
         quote! {
             for (i, s) in self.#ident.iter_mut().enumerate() {
-                hm.insert(format!("{}{}", #name, i + 1).to_string(), s.get_signal_mut());
+                assert!(hm.insert(format!("{}{}", #name, i + 1).to_string(), s.get_signal_mut()).is_none(), "Duplicate IO name: {}", #name);
             }
         }
     }else{
         quote! {
-            hm.insert(#name.to_string(), self.#ident.get_signal_mut());
+            assert!(hm.insert(#name.to_string(), self.#ident.get_signal_mut()).is_none(), "Duplicate IO name: {}", #name);
         }
     }
 }
