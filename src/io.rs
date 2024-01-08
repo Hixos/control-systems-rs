@@ -9,11 +9,16 @@ use std::{
 #[derive(Debug, Clone)]
 pub struct AnySignal {
     value: Rc<RefCell<dyn Any>>, // Option<T>
+    name: Option<String>,
     signal_type_id: TypeId,
     signal_type_name: &'static str,
 }
 
 impl AnySignal {
+    pub fn name(&self) -> &Option<String> {
+        &self.name
+    }
+
     pub fn signal_type_id(&self) -> TypeId {
         self.signal_type_id
     }
@@ -27,6 +32,7 @@ impl AnySignal {
     pub(crate) fn new<T: 'static>() -> Self {
         AnySignal {
             value: Rc::new(RefCell::new(Option::<T>::None)),
+            name: None,
             signal_type_id: TypeId::of::<T>(),
             signal_type_name: std::any::type_name::<T>(),
         }
@@ -60,6 +66,10 @@ impl AnySignal {
 
     pub(crate) fn set<T: 'static>(&self, value: T) {
         self.try_set(value).unwrap();
+    }
+
+    pub(crate) fn set_name(&mut self, name: &str) {
+        self.name = Some(name.to_string());
     }
 }
 
@@ -108,6 +118,10 @@ impl <T> Input<T> {
     pub fn get_signal_mut(&mut self) -> &mut Option<AnySignal> {
         &mut self.signal
     }
+
+    pub fn signal_name(&self) -> String {
+        self.signal.as_ref().unwrap().name.as_ref().unwrap().clone()
+    }
 }
 
 #[derive(Debug)]
@@ -142,5 +156,9 @@ impl<T> Output<T>
 
     pub fn get_signal_mut(&mut self) -> &mut AnySignal {
         &mut self.signal
+    }
+
+    pub fn signal_name(&self) -> String {
+        self.signal.name.as_ref().unwrap().clone()
     }
 }

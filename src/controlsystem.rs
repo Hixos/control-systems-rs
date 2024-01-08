@@ -115,30 +115,31 @@ impl ControlSystemBuilder {
         let block_name = block_data.block.name();
         let mut output_signals = block_data.block.output_signals();
 
-        for (port, signal) in output_connections.iter() {
-            if self.signals.contains_key(*signal) {
+        for (port, signal_name) in output_connections.iter() {
+            if self.signals.contains_key(*signal_name) {
                 // A signal with the same name is already produced by another output
                 return Err(anyhow!(
                     "Cannot connect output '{}/{}': Signal '{}' already has a producer!",
                     block_name.clone(),
                     port,
-                    signal
+                    signal_name
                 ));
             } else {
+                let signal = output_signals.get_mut(*port).ok_or(anyhow!(
+                    "No output port named '{}' in block '{}'",
+                    port,
+                    block_name.clone()
+                ))?;
+
+                signal.set_name(signal_name);
+
                 self.signals.insert(
-                    signal.to_string(),
-                    (*(output_signals
-                        .get(*port)
-                        .ok_or(anyhow!(
-                            "No output port named '{}' in block '{}'",
-                            port,
-                            block_name.clone()
-                        ))?))
-                        .clone(),
+                    signal_name.to_string(),
+                    (*(signal)).clone()
                 );
                 block_data
                     .registered_outputs
-                    .insert(port.to_string(), signal.to_string());
+                    .insert(port.to_string(), signal_name.to_string());
                 output_signals.remove(*port);
             }
         }
