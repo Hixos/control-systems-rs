@@ -1,5 +1,6 @@
 use arrayinit::arr;
 use control_system::{
+    controlblock::StepInfo,
     io::{Input, Output},
     Block, BlockIO,
 };
@@ -17,7 +18,7 @@ pub struct Add<T, const N: usize> {
     y: Output<T>,
 }
 
-impl<T, const N: usize,> Add<T, N>
+impl<T, const N: usize> Add<T, N>
 where
     T: Default,
     Output<T>: Default,
@@ -35,7 +36,7 @@ impl<T, const N: usize> Block for Add<T, N>
 where
     T: Clone + std::iter::Sum + 'static,
 {
-    fn step(&mut self) {
+    fn step(&mut self, _: StepInfo) {
         self.y.set(self.u.iter().map(|i| i.get()).sum());
     }
 }
@@ -69,7 +70,7 @@ impl<T> Block for Constant<T>
 where
     T: 'static + Clone,
 {
-    fn step(&mut self) {
+    fn step(&mut self, _: StepInfo) {
         self.y.set(self.value.clone());
     }
 }
@@ -86,7 +87,7 @@ pub struct Delay<T, const D: usize> {
     y: Output<T>,
 
     buffer: [T; D],
-    index: usize
+    index: usize,
 }
 
 impl<T, const D: usize> Delay<T, D>
@@ -99,7 +100,7 @@ where
             u: Input::default(),
             y: Output::default(),
             buffer: initial_value,
-            index: 0
+            index: 0,
         }
     }
 }
@@ -108,12 +109,17 @@ impl<T, const D: usize> Block for Delay<T, D>
 where
     T: 'static + Clone,
 {
-    fn step(&mut self) {
+    fn step(&mut self, k: StepInfo) {
+        if k.k > 1 {
+            let ix = (self.index + D + 1) % D; // index - 1
+            self.buffer[ix] = self.u.get();
+        }
+
         let v: T = self.buffer[self.index].clone();
-        self.buffer[self.index] = self.u.get();
+        self.y.set(v);
+
         self.index = (self.index + 1) % D;
 
-        self.y.set(v);
     }
 
     fn delay(&self) -> u32 {
@@ -141,7 +147,7 @@ where
         Generator {
             name: name.to_string(),
             y: Output::default(),
-            generator
+            generator,
         }
     }
 }
@@ -149,13 +155,12 @@ where
 impl<T, F> Block for Generator<T, F>
 where
     T: 'static + Clone,
-    F: Fn() -> T
+    F: Fn() -> T,
 {
-    fn step(&mut self) {
+    fn step(&mut self, _: StepInfo) {
         self.y.set((self.generator)());
     }
 }
-
 
 #[derive(BlockIO)]
 pub struct Print<T> {
@@ -168,7 +173,7 @@ pub struct Print<T> {
 
 impl<T> Print<T>
 where
-    T: Default  + 'static,
+    T: Default + 'static,
 {
     pub fn new(name: &str) -> Self {
         Print {
@@ -182,7 +187,13 @@ impl<T> Block for Print<T>
 where
     T: core::fmt::Debug + Clone + 'static,
 {
-    fn step(&mut self) {
-        println!("{} = {:?}", self.name, self.u.get());
+    fn step(&mut self, k: StepInfo) {
+        println!(
+            "t: {:.2} {}->{} = {:?}",
+            k.t,
+            self.name,
+            self.u.signal_name(),
+            self.u.get()
+        );
     }
 }

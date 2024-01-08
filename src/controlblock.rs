@@ -1,6 +1,5 @@
-use std::collections::HashMap;
-use anyhow::Result;
 use crate::io::AnySignal;
+use std::collections::HashMap;
 
 pub trait BlockIO {
     fn name(&self) -> String;
@@ -9,8 +8,8 @@ pub trait BlockIO {
     fn output_signals(&mut self) -> HashMap<String, &mut AnySignal>;
 }
 
-pub trait Block : BlockIO {
-    fn step(&mut self);
+pub trait Block: BlockIO {
+    fn step(&mut self, k: StepInfo);
 
     fn delay(&self) -> u32 {
         0

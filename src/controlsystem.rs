@@ -1,21 +1,25 @@
 use std::collections::{HashMap, HashSet};
 
 use anyhow::{anyhow, Result};
-use petgraph::{algo::toposort, dot::Dot, graph, prelude::NodeIndex, Graph};
+use petgraph::{algo::toposort, dot::Dot, prelude::NodeIndex, Graph};
 
-use crate::{controlblock::Block, io::AnySignal};
+use crate::{controlblock::{Block, StepInfo}, io::AnySignal};
 
 pub struct ControlSystem {
     signals: HashMap<String, AnySignal>,
     blocks: Vec<Box<dyn Block>>,
     graph: Graph<String, String>,
+    step: StepInfo
 }
 
 impl ControlSystem {
     pub fn step(&mut self) {
         for b in self.blocks.iter_mut() {
-            b.step();
+            b.step(self.step);
         }
+
+        self.step.k += 1;
+        self.step.t += self.step.dt;
     }
 }
 
@@ -58,7 +62,7 @@ impl ControlSystemBuilder {
         Ok(self)
     }
 
-    pub fn build(mut self) -> Result<ControlSystem> {
+    pub fn build(mut self, dt: f64) -> Result<ControlSystem> {
         for (name, data) in self.blocks.iter_mut() {
 
             let mut input_signals = data.block.input_signals();
@@ -92,6 +96,7 @@ impl ControlSystemBuilder {
                     signals: self.signals,
                     blocks,
                     graph,
+                    step: StepInfo::new(dt)
                 })
             }
             Err(cycle) => {
