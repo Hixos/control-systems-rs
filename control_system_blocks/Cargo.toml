@@ -1,5 +1,5 @@
 [package]
-name = "control-system-blocks"
+name = "control_system_blocks"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,6 +7,6 @@ edition = "2021"
 
 [dependencies]
 control-system = { path = ".." }
-control-system-derive = { path = "../control-system-derive" }
+control_system_derive = { path = "../control_system_derive" }
 arrayinit = "0.1.1"
 anyhow = "1.0.79"

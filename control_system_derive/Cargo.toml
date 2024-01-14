@@ -1,5 +1,5 @@
 [package]
-name = "control-system-derive"
+name = "control_system_derive"
 version = "0.1.0"
 edition = "2021"
 

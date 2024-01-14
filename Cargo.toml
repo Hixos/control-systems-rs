@@ -1,5 +1,5 @@
 [package]
-name = "control-system"
+name = "control_system"
 version = "0.1.0"
 edition = "2021"
 
@@ -8,11 +8,11 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.79"
 petgraph = "0.6.4"
-control-system-derive = { path = "control-system-derive" }
+control_system_derive = { path = "control_system_derive" }
 
 
 [workspace]
 members = [
-    "control-system-derive",
-    "control-system-blocks",
+    "control_system_derive",
+    "control_system_blocks",
 ]
