@@ -1,0 +1,16 @@
+[package]
+name = "control_system_plotter"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+control_system = { path = ".." }
+control_system_derive = { path = "../control_system_derive" }
+num-traits = "0.2.17"
+
+rust_data_inspector_signals = {git = "https://github.com/Hixos/rust-data-inspector"}
+# rust_data_inspector_signals = {path = "/home/luca/code/misc/rust-data-inspector/rust_data_inspector_signals"}
+
+thiserror = "1.0.56"

@@ -9,10 +9,12 @@ edition = "2021"
 anyhow = "1.0.79"
 petgraph = "0.6.4"
 control_system_derive = { path = "control_system_derive" }
+nalgebra = "0.32.3"
 
 
 [workspace]
 members = [
     "control_system_derive",
     "control_system_blocks",
+    "control_system_plotter",
 ]
