@@ -6,8 +6,10 @@ use petgraph::{algo::toposort, dot::Dot, prelude::NodeIndex, Graph};
 use crate::{controlblock::{Block, StepInfo}, io::AnySignal};
 
 pub struct ControlSystem {
+    #[allow(dead_code)]
     signals: HashMap<String, AnySignal>,
     blocks: Vec<Box<dyn Block>>,
+    #[allow(dead_code)]
     graph: Graph<String, String>,
     step: StepInfo
 }
@@ -193,7 +195,7 @@ impl ControlSystemBuilder {
         let mut graph = Graph::new();
 
         let mut node_indices: HashMap<String, NodeIndex> = HashMap::new();
-        for (name, block_data) in self.blocks.iter() {
+        for (name, _) in self.blocks.iter() {
             let index = graph.add_node(name.clone());
             node_indices.insert(name.clone(), index);
         }
