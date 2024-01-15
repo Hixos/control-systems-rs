@@ -17,4 +17,5 @@ members = [
     "control_system_derive",
     "control_system_blocks",
     "control_system_plotter",
+    "control_system_examples",
 ]

@@ -1,0 +1,18 @@
+[package]
+name = "control_system_examples"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+control_system = { path = ".." }
+control_system_derive = { path = "../control_system_derive" }
+control_system_blocks = { path = "../control_system_blocks" }
+control_system_plotter = { path = "../control_system_plotter" }
+
+rust_data_inspector = { git = "https://github.com/Hixos/rust-data-inspector" }
+rust_data_inspector_signals = { git = "https://github.com/Hixos/rust-data-inspector" }
+
+nalgebra = "0.32.3"
+anyhow = "1.0.79"
