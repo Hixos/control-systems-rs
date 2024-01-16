@@ -1,5 +1,3 @@
-use std::collections::btree_map::Iter;
-
 use anyhow::Result;
 use control_system::ControlSystemBuilder;
 
@@ -24,7 +22,7 @@ fn main() -> Result<()> {
     let mut controlsystem = builder.build(1.0)?;
 
     for _ in 0..10 {
-        controlsystem.step();
+        controlsystem.step()?;
     }
 
     Ok(())

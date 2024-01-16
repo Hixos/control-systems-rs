@@ -1,8 +1,8 @@
 use arrayinit::arr;
 use control_system::{
-    controlblock::StepInfo,
+    controlblock::{StepInfo, StepResult},
     io::{Input, Output},
-    Block, BlockIO,
+    Block, BlockIO, Result,
 };
 use control_system_derive::BlockIO;
 
@@ -36,8 +36,10 @@ impl<T, const N: usize> Block for Add<T, N>
 where
     T: Clone + std::iter::Sum + 'static,
 {
-    fn step(&mut self, _: StepInfo) {
+    fn step(&mut self, _: StepInfo) -> Result<StepResult> {
         self.y.set(self.u.iter().map(|i| i.get()).sum());
+
+        Ok(StepResult::Continue)
     }
 }
 
@@ -70,8 +72,9 @@ impl<T> Block for Constant<T>
 where
     T: 'static + Clone,
 {
-    fn step(&mut self, _: StepInfo) {
+    fn step(&mut self, _: StepInfo) -> Result<StepResult> {
         self.y.set(self.value.clone());
+        Ok(StepResult::Continue)
     }
 }
 
@@ -109,7 +112,7 @@ impl<T, const D: usize> Block for Delay<T, D>
 where
     T: 'static + Clone,
 {
-    fn step(&mut self, k: StepInfo) {
+    fn step(&mut self, k: StepInfo) -> Result<StepResult> {
         if k.k > 1 {
             let ix = (self.index + D + 1) % D; // index - 1
             self.buffer[ix] = self.u.get();
@@ -120,6 +123,7 @@ where
 
         self.index = (self.index + 1) % D;
 
+        Ok(StepResult::Continue)
     }
 
     fn delay(&self) -> u32 {
@@ -157,8 +161,9 @@ where
     T: 'static + Clone,
     F: Fn() -> T,
 {
-    fn step(&mut self, _: StepInfo) {
+    fn step(&mut self, _: StepInfo)  -> Result<StepResult> {
         self.y.set((self.generator)());
+        Ok(StepResult::Continue)
     }
 }
 
@@ -187,7 +192,7 @@ impl<T> Block for Print<T>
 where
     T: core::fmt::Debug + Clone + 'static,
 {
-    fn step(&mut self, k: StepInfo) {
+    fn step(&mut self, k: StepInfo)  -> Result<StepResult>{
         println!(
             "t: {:.2} {}->{} = {:?}",
             k.t,
@@ -195,5 +200,6 @@ where
             self.u.signal_name(),
             self.u.get()
         );
+        Ok(StepResult::Continue)
     }
 }

@@ -1,10 +1,11 @@
-use anyhow::{anyhow, Result};
 use std::{
     any::{Any, TypeId},
     cell::RefCell,
     marker::PhantomData,
     rc::Rc,
 };
+
+use crate::{ControlSystemError, Result};
 
 #[derive(Debug, Clone)]
 pub struct AnySignal {
@@ -38,15 +39,15 @@ impl AnySignal {
         }
     }
 
-    pub(crate) fn try_get<T: Clone + 'static>(&self) -> Result<Option<T>> {
+    pub(crate) fn try_get<T: Clone + 'static>(&self) -> Result<Option<T>, ControlSystemError> {
         self.value
             .borrow()
             .downcast_ref::<Option<T>>()
-            .ok_or(anyhow!(
-                "Trying to get value of type '{}', but signal has is a '{}'",
-                std::any::type_name::<T>(),
-                self.signal_type_name
-            ))
+            .ok_or(ControlSystemError::TypeError {
+                signal: self.name.clone().unwrap(),
+                typename: std::any::type_name::<T>().to_string(),
+                signal_typename: self.signal_type_name.to_string(),
+            })
             .map(|v| v.clone())
     }
 
@@ -56,11 +57,12 @@ impl AnySignal {
 
     pub(crate) fn try_set<T: 'static>(&self, value: T) -> Result<()> {
         let mut v = self.value.borrow_mut();
-        *v.downcast_mut::<Option<T>>().ok_or(anyhow!(
-            "Trying to set value of type '{}', but signal is a '{}'",
-            std::any::type_name::<T>(),
-            self.signal_type_name
-        ))? = Some(value);
+        *v.downcast_mut::<Option<T>>()
+            .ok_or(ControlSystemError::TypeError {
+                signal: self.name.clone().unwrap(),
+                typename: std::any::type_name::<T>().to_string(),
+                signal_typename: self.signal_type_name.to_string(),
+            })? = Some(value);
         Ok(())
     }
 
@@ -72,7 +74,6 @@ impl AnySignal {
         self.name = Some(name.to_string());
     }
 }
-
 
 #[derive(Debug, Default, Clone)]
 pub struct Input<T> {
@@ -97,20 +98,19 @@ where
         debug_assert!(self.signal.is_none(), "Signal is already connected!");
 
         if signal.signal_type_id() != TypeId::of::<T>() {
-            return Err(anyhow!(
-                "Cannot connect signal of type '{}' to Input of type '{}'",
-                signal.signal_type_name,
-                std::any::type_name::<T>()
-            ));
+            return Err(ControlSystemError::TypeError {
+                signal: signal.name.clone().unwrap(),
+                typename: std::any::type_name::<T>().to_string(),
+                signal_typename: signal.signal_type_name.to_string(),
+            });
         }
 
         self.signal = Some(signal.clone());
         Ok(())
     }
-    
 }
 
-impl <T> Input<T> {
+impl<T> Input<T> {
     pub fn get_signal(&self) -> &Option<AnySignal> {
         &self.signal
     }
@@ -148,8 +148,7 @@ where
     }
 }
 
-impl<T> Output<T>
-{
+impl<T> Output<T> {
     pub fn get_signal(&self) -> &AnySignal {
         &self.signal
     }

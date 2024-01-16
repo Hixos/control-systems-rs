@@ -1,10 +1,9 @@
-use control_system::{io::Input, Block};
+use control_system::{controlblock::StepResult, io::Input, Block, ControlSystemError};
+use control_system::{BlockIO, ControlSystemBuilder};
 use control_system_derive::BlockIO;
-use control_system::BlockIO;
 use rust_data_inspector_signals::{PlotSignalProducer, PlotSignals};
 
 use crate::Plottable;
-
 
 #[derive(BlockIO)]
 pub struct Plotter<T> {
@@ -28,7 +27,37 @@ impl<T: Plottable + Default> Plotter<T> {
 }
 
 impl<T: Clone + Plottable + 'static> Block for Plotter<T> {
-    fn step(&mut self, k: control_system::controlblock::StepInfo) {
+    fn step(
+        &mut self,
+        k: control_system::controlblock::StepInfo,
+    ) -> Result<StepResult, ControlSystemError> {
         self.u.get().plot_sample(k.t, &mut self.producers);
+
+        Ok(StepResult::Continue)
     }
+}
+
+pub fn add_plotter<T>(
+    signal_name: &str,
+    builder: &mut ControlSystemBuilder,
+    signals: &mut PlotSignals,
+) -> control_system::Result<()>
+where
+    T: Plottable + Default + Clone + 'static,
+{
+    use rand::distributions::Alphanumeric;
+    use rand::{thread_rng, Rng};
+
+    let rand_string: String = thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(6)
+        .map(char::from)
+        .collect();
+
+    let name = format!("plotter{}_{}", signal_name.replace('/', "_"), rand_string);
+    let plotter = Plotter::<T>::new(name.as_str(), signal_name, signals);
+
+    builder.add_block(plotter, &[("u", signal_name)], &[])?;
+
+    Ok(())
 }

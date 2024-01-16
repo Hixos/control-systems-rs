@@ -9,6 +9,7 @@ edition = "2021"
 control_system = { path = ".." }
 control_system_derive = { path = "../control_system_derive" }
 num-traits = "0.2.17"
+rand = "0.8.5"
 
 rust_data_inspector_signals = {git = "https://github.com/Hixos/rust-data-inspector"}
 # rust_data_inspector_signals = {path = "/home/luca/code/misc/rust-data-inspector/rust_data_inspector_signals"}

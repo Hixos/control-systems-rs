@@ -1,4 +1,4 @@
-use crate::io::AnySignal;
+use crate::{io::AnySignal, Result};
 use std::collections::HashMap;
 
 pub trait BlockIO {
@@ -9,11 +9,18 @@ pub trait BlockIO {
 }
 
 pub trait Block: BlockIO {
-    fn step(&mut self, k: StepInfo);
+    /// Propagates the block forward by one step
+    fn step(&mut self, k: StepInfo) -> Result<StepResult>;
 
     fn delay(&self) -> u32 {
         0
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StepResult {
+    Continue,
+    Stop,
 }
 
 #[derive(Debug, Clone, Copy)]

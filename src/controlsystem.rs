@@ -1,9 +1,13 @@
 use std::collections::{HashMap, HashSet};
 
-use anyhow::{anyhow, Result};
 use petgraph::{algo::toposort, dot::Dot, prelude::NodeIndex, Graph};
 
-use crate::{controlblock::{Block, StepInfo}, io::AnySignal};
+use crate::{
+    controlblock::{Block, StepInfo, StepResult},
+    io::AnySignal,
+    ControlSystemError,
+    Result
+};
 
 pub struct ControlSystem {
     #[allow(dead_code)]
@@ -11,17 +15,25 @@ pub struct ControlSystem {
     blocks: Vec<Box<dyn Block>>,
     #[allow(dead_code)]
     graph: Graph<String, String>,
-    step: StepInfo
+    step: StepInfo,
 }
 
 impl ControlSystem {
-    pub fn step(&mut self) {
+    pub fn step(&mut self) -> Result<StepResult> {
+        let mut stop = false;
         for b in self.blocks.iter_mut() {
-            b.step(self.step);
+            // In case of stop, complete this step and return it
+            stop = stop || b.step(self.step)? == StepResult::Stop;
         }
 
         self.step.k += 1;
         self.step.t += self.step.dt;
+
+        if stop {
+            Ok(StepResult::Stop)
+        }else{
+            Ok(StepResult::Continue)
+        }
     }
 }
 
@@ -43,11 +55,11 @@ impl ControlSystemBuilder {
         block: T,
         input_connections: &[(&str, &str)],
         output_connections: &[(&str, &str)],
-    ) -> Result<&mut Self> {
+    ) -> Result<&mut Self, ControlSystemError> {
         let name = block.name();
-        
+
         if self.blocks.contains_key(&name) {
-            return Err(anyhow!("A block named '{}' is already present!", name));
+            return Err(ControlSystemError::DuplicateBlockName(name));
         }
 
         let mut block_data = BlockData {
@@ -64,18 +76,19 @@ impl ControlSystemBuilder {
         Ok(self)
     }
 
-    pub fn build(mut self, dt: f64) -> Result<ControlSystem> {
+    pub fn build(mut self, dt: f64) -> Result<ControlSystem, ControlSystemError> {
         for (name, data) in self.blocks.iter_mut() {
-
             let mut input_signals = data.block.input_signals();
 
             for (signal, input) in data.registered_inputs.iter() {
-                let signal = self.signals.get(signal).ok_or(anyhow!(
-                    "Could not connect input '{}/{}': No signal named '{}'",
-                    name,
-                    input,
-                    signal
-                ))?;
+                let signal =
+                    self.signals
+                        .get(signal)
+                        .ok_or(ControlSystemError::UnknownSignal {
+                            port: input.clone(),
+                            signal: signal.clone(),
+                            blockname: name.clone()
+                        })?;
 
                 **input_signals.get_mut(input).unwrap() = Some(signal.clone());
             }
@@ -98,12 +111,12 @@ impl ControlSystemBuilder {
                     signals: self.signals,
                     blocks,
                     graph,
-                    step: StepInfo::new(dt)
+                    step: StepInfo::new(dt),
                 })
             }
-            Err(cycle) => {
-                Err(anyhow!(format!("Control system presents a cycle containing Node '{}'. You probably want to break the cycle by adding a delay block.", graph.node_weight(cycle.node_id()).unwrap())))
-            }
+            Err(cycle) => Err(ControlSystemError::CycleDetected(
+                graph.node_weight(cycle.node_id()).unwrap().clone(),
+            )),
         }
     }
 }
@@ -113,32 +126,31 @@ impl ControlSystemBuilder {
         &mut self,
         block_data: &mut BlockData,
         output_connections: &[(&str, &str)],
-    ) -> Result<()> {
+    ) -> Result<(), ControlSystemError> {
         let block_name = block_data.block.name();
         let mut output_signals = block_data.block.output_signals();
 
         for (port, signal_name) in output_connections.iter() {
             if self.signals.contains_key(*signal_name) {
                 // A signal with the same name is already produced by another output
-                return Err(anyhow!(
-                    "Cannot connect output '{}/{}': Signal '{}' already has a producer!",
-                    block_name.clone(),
-                    port,
-                    signal_name
-                ));
+                return Err(ControlSystemError::MultipleProducers {
+                    port: port.to_string(),
+                    signal: signal_name.to_string(),
+                    blockname: block_name.clone(),
+                });
             } else {
-                let signal = output_signals.get_mut(*port).ok_or(anyhow!(
-                    "No output port named '{}' in block '{}'",
-                    port,
-                    block_name.clone()
-                ))?;
+                let signal =
+                    output_signals
+                        .get_mut(*port)
+                        .ok_or(ControlSystemError::UnknownPort {
+                            port: port.to_string(),
+                            blockname: block_name.clone(),
+                        })?;
 
                 signal.set_name(signal_name);
 
-                self.signals.insert(
-                    signal_name.to_string(),
-                    (*(signal)).clone()
-                );
+                self.signals
+                    .insert(signal_name.to_string(), (*(signal)).clone());
                 block_data
                     .registered_outputs
                     .insert(port.to_string(), signal_name.to_string());
@@ -149,11 +161,10 @@ impl ControlSystemBuilder {
         if output_signals.is_empty() {
             Ok(())
         } else {
-            Err(anyhow!(
-                "Output ports {:?} of block '{}' were not connected",
-                output_signals.keys(),
-                block_name.clone()
-            ))
+            Err(ControlSystemError::UnconnectedPorts {
+                ports: output_signals.keys().cloned().collect(),
+                blockname: block_name.clone(),
+            })
         }
     }
 
@@ -161,7 +172,7 @@ impl ControlSystemBuilder {
         &mut self,
         block_data: &mut BlockData,
         input_connections: &[(&str, &str)],
-    ) -> Result<()> {
+    ) -> Result<(), ControlSystemError> {
         let mut input_signals: HashSet<String> =
             block_data.block.input_signals().into_keys().collect();
 
@@ -172,22 +183,20 @@ impl ControlSystemBuilder {
                     .insert(signal.to_string(), port.to_string());
                 input_signals.remove(*port);
             } else {
-                return Err(anyhow!(
-                    "No input named {} in block {}",
-                    port,
-                    block_data.block.name()
-                ));
+                return Err(ControlSystemError::UnknownPort {
+                    port: port.to_string(),
+                    blockname: block_data.block.name(),
+                });
             }
         }
 
         if input_signals.is_empty() {
             Ok(())
         } else {
-            Err(anyhow!(
-                "Input ports {:?} of block '{}' were not connected",
-                input_signals.iter(),
-                block_data.block.name()
-            ))
+            Err(ControlSystemError::UnconnectedPorts {
+                ports: input_signals.iter().cloned().collect(),
+                blockname: block_data.block.name(),
+            })
         }
     }
 

@@ -1,5 +1,5 @@
 mod plotter;
-pub use plotter::Plotter;
+pub use plotter::{Plotter, add_plotter};
 
 use num_traits::Num;
 use rust_data_inspector_signals::{PlotSignalError, PlotSignalProducer, PlotSignalSample, PlotSignals};

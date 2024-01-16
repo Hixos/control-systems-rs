@@ -6,10 +6,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.79"
 petgraph = "0.6.4"
 control_system_derive = { path = "control_system_derive" }
 nalgebra = "0.32.3"
+thiserror = "1.0.56"
 
 
 [workspace]
