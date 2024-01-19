@@ -129,7 +129,7 @@ impl BlockIOAttribute {
                         },
                         IOFieldState::NameKey => match token {
                             TokenTree::Ident(ident) => {
-                                if ident.to_string() == "name" {
+                                if ident == "name" {
                                     state = State::IOField(io, IOFieldState::Equals);
                                 } else {
                                     panic!("Unexpected ident in 'blockio' attribute '{}'. Expeting 'name'.", ident);
