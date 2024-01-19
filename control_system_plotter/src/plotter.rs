@@ -1,5 +1,5 @@
-use control_system::{controlblock::StepResult, io::Input, Block, ControlSystemError};
-use control_system::{BlockIO, ControlSystemBuilder};
+use control_system::{StepResult, io::Input, Block, ControlSystemError};
+use control_system::{BlockIO, ControlSystemBuilder, StepInfo};
 use control_system_derive::BlockIO;
 use rust_data_inspector_signals::{PlotSignalProducer, PlotSignals};
 
@@ -29,7 +29,7 @@ impl<T: Plottable + Default> Plotter<T> {
 impl<T: Clone + Plottable + 'static> Block for Plotter<T> {
     fn step(
         &mut self,
-        k: control_system::controlblock::StepInfo,
+        k: StepInfo,
     ) -> Result<StepResult, ControlSystemError> {
         self.u.get().plot_sample(k.t, &mut self.producers);
 

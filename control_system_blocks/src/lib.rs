@@ -1,8 +1,7 @@
 use arrayinit::arr;
 use control_system::{
-    controlblock::{StepInfo, StepResult},
     io::{Input, Output},
-    Block, BlockIO, Result,
+    Block, BlockIO, Result, StepInfo, StepResult,
 };
 use control_system_derive::BlockIO;
 
@@ -161,7 +160,7 @@ where
     T: 'static + Clone,
     F: Fn() -> T,
 {
-    fn step(&mut self, _: StepInfo)  -> Result<StepResult> {
+    fn step(&mut self, _: StepInfo) -> Result<StepResult> {
         self.y.set((self.generator)());
         Ok(StepResult::Continue)
     }
@@ -192,7 +191,7 @@ impl<T> Block for Print<T>
 where
     T: core::fmt::Debug + Clone + 'static,
 {
-    fn step(&mut self, k: StepInfo)  -> Result<StepResult>{
+    fn step(&mut self, k: StepInfo) -> Result<StepResult> {
         println!(
             "t: {:.2} {}->{} = {:?}",
             k.t,

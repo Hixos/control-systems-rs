@@ -1,10 +1,13 @@
-pub mod controlblock;
-pub mod controlsystem;
+mod controlblock;
+mod controlsystem;
+mod parameters;
+
 pub mod io;
 pub mod numeric;
 
-pub use controlblock::{Block, BlockIO};
+pub use controlblock::{Block, BlockIO, StepResult, StepInfo};
 pub use controlsystem::{ControlSystem, ControlSystemBuilder};
+
 
 use thiserror::Error;
 

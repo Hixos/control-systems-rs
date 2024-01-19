@@ -5,10 +5,9 @@ use std::{
 
 use anyhow::Result;
 use control_system::{
-    controlblock::{StepInfo, StepResult},
     io::{Input, Output},
     numeric::ode::{ODESolver, RungeKutta4},
-    Block,
+    Block, StepInfo, StepResult,
 };
 use control_system::{BlockIO, ControlSystemBuilder};
 use control_system_blocks::Constant;
