@@ -19,7 +19,7 @@ pub struct ParameterStore {
 }
 
 impl ParameterStore {
-    pub fn from_file(file: &Path, control_sys_name: &str) -> Result<Self, ParameterStoreError> {
+    pub fn new(file: &Path, control_sys_name: &str) -> Result<Self, ParameterStoreError> {
         let config = if file.exists() {
             Config::builder()
                 .add_source(config::File::new(
