@@ -10,6 +10,9 @@ petgraph = "0.6.4"
 control_system_derive = { path = "control_system_derive" }
 nalgebra = "0.32.3"
 thiserror = "1.0.56"
+serde = { version = "1.0.195", features = ["derive"] }
+config = "0.13.4"
+toml = "0.8.8"
 
 
 [workspace]

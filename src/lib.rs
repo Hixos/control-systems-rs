@@ -7,6 +7,7 @@ pub mod numeric;
 
 pub use controlblock::{Block, BlockIO, StepResult, StepInfo};
 pub use controlsystem::{ControlSystem, ControlSystemBuilder};
+pub use parameters::{ParameterStore, ParameterStoreError};
 
 
 use thiserror::Error;
