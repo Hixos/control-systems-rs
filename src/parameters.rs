@@ -39,7 +39,7 @@ impl ParameterStore {
         })
     }
 
-    pub fn load_or_insert<T: DeserializeOwned + Serialize + Clone>(
+    pub fn get_parameters<T: DeserializeOwned + Serialize + Clone>(
         &mut self,
         block_name: &str,
         default: T,

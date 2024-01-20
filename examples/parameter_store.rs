@@ -35,8 +35,8 @@ fn main() {
 
     let mut store = ParameterStore::new(Path::new("test.toml"), "test_cs").unwrap();
 
-    let tc1 = store.load_or_insert("block_1", tc1_default).unwrap();
-    let tc2 = store.load_or_insert("block_2", tc2_default).unwrap();
+    let tc1 = store.get_parameters("block_1", tc1_default).unwrap();
+    let tc2 = store.get_parameters("block_2", tc2_default).unwrap();
 
     println!("{:?}", tc1);
     println!("{:?}", tc2);
