@@ -1,7 +1,11 @@
 use config::{Config, FileFormat};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
-    collections::HashMap, default, fs::File, io::{self, BufReader, Read}, path::{Path, PathBuf}
+    collections::HashMap,
+    default,
+    fs::File,
+    io::{self, BufReader, Read},
+    path::{Path, PathBuf},
 };
 use thiserror::Error;
 use toml::Table;
@@ -16,13 +20,16 @@ pub struct ParameterStore {
 
 impl ParameterStore {
     pub fn from_file(file: &Path, control_sys_name: &str) -> Result<Self, ParameterStoreError> {
-        let config = Config::builder()
-            .add_source(config::File::new(
-                file.as_os_str().to_str().unwrap(),
-                FileFormat::Toml,
-            ))
-            .build()
-            .unwrap();
+        let config = if file.exists() {
+            Config::builder()
+                .add_source(config::File::new(
+                    file.as_os_str().to_str().unwrap(),
+                    FileFormat::Toml,
+                ))
+                .build()?
+        } else {
+            Config::default()
+        };
 
         Ok(ParameterStore {
             file: file.to_owned(),
@@ -40,10 +47,7 @@ impl ParameterStore {
         let default = Config::try_from(&default).unwrap();
         let key = format!("{}.{}", self.control_system_name, block_name);
         let param: T = Config::builder()
-            .set_default(
-                key.as_str(),
-                default.cache,
-            )?
+            .set_default(key.as_str(), default.cache)?
             .add_source(self.config.clone())
             .build()?
             .get(key.as_str())?;
