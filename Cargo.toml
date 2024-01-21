@@ -24,3 +24,6 @@ control_system_plotter = { path = "control_system_plotter", optional = true }
 [features]
 blocks = ["dep:control_system_blocks"]
 plotter = ["dep:control_system_plotter"]
+
+[profile.dev.package.rust_data_inspector]
+opt-level = 3
