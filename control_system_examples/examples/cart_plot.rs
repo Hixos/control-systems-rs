@@ -1,4 +1,5 @@
 use std::{
+    path::Path,
     sync::mpsc::{channel, Sender},
     thread::spawn,
 };
@@ -7,15 +8,23 @@ use anyhow::Result;
 use control_system::{
     io::{Input, Output},
     numeric::ode::{ODESolver, RungeKutta4},
-    Block, StepInfo, StepResult,
+    Block, ControlSystemParameters, ParameterStore, StepInfo, StepResult,
 };
 use control_system::{BlockIO, ControlSystemBuilder};
-use control_system_blocks::Constant;
+use control_system_blocks::{Constant, ConstantParams};
 use control_system_derive::BlockIO;
 use control_system_plotter::add_plotter;
 use nalgebra::Vector2;
 use rust_data_inspector::datainspector::DataInspector;
 use rust_data_inspector_signals::PlotSignals;
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
+struct CartParams {
+    mass: f64,
+    pos0: f64,
+    vel0: f64,
+}
 
 #[derive(BlockIO)]
 struct Cart {
@@ -32,13 +41,13 @@ struct Cart {
     #[blockio(output)]
     y_acc: Output<f64>,
 
-    mass: f64,
+    params: CartParams,
     state: Vector2<f64>,
 }
 
 impl Block for Cart {
     fn step(&mut self, k: StepInfo) -> control_system::Result<StepResult> {
-        let acc = self.u_force.get() / self.mass;
+        let acc = self.u_force.get() / self.params.mass;
 
         let odefun = |_, x: Vector2<f64>| Vector2::new(x[1], acc);
 
@@ -55,16 +64,22 @@ impl Block for Cart {
 }
 
 impl Cart {
-    fn new(mass: f64, pos0: f64, vel0: f64) -> Self {
+    fn new(params: CartParams) -> Self {
         Cart {
             name: "cart".to_string(),
-            mass,
-            state: Vector2::new(pos0, vel0),
+            state: Vector2::new(params.pos0, params.vel0),
+            params,
             u_force: Input::default(),
             y_pos: Output::default(),
             y_vel: Output::default(),
             y_acc: Output::default(),
         }
+    }
+
+    fn from_store(store: &mut ParameterStore, default_params: CartParams) -> Result<Self> {
+        let params = store.get_block_params("cart", default_params)?;
+
+        Ok(Self::new(params))
     }
 }
 
@@ -82,10 +97,20 @@ fn main() -> Result<()> {
 }
 
 fn run_control_system(signals_snd: Sender<PlotSignals>) -> Result<()> {
+    let mut store = ParameterStore::new(Path::new("cart.toml"), "cart")?;
+
     let mut signals = PlotSignals::default();
 
-    let cart = Cart::new(1.0, 0.0, 0.0);
-    let constant = Constant::new("force", 100.0);
+    let cart = Cart::from_store(
+        &mut store,
+        CartParams {
+            mass: 1.0,
+            pos0: 0.0,
+            vel0: 0.0,
+        },
+    )?;
+
+    let constant = Constant::from_store("force", &mut store, ConstantParams { c: 100.0 })?;
 
     let mut builder = ControlSystemBuilder::default();
 
@@ -111,7 +136,10 @@ fn run_control_system(signals_snd: Sender<PlotSignals>) -> Result<()> {
         .send(signals)
         .expect("Could not send signals to GUI");
 
-    let mut cs = builder.build(0.01)?;
+    let mut cs =
+        builder.build_from_store("cart", &mut store, ControlSystemParameters::new(0.01))?;
+
+    store.save()?;
 
     for _ in 0..1000 {
         if cs.step()? == StepResult::Stop {

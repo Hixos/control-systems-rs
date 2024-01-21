@@ -1,24 +1,46 @@
 use std::collections::{HashMap, HashSet};
 
 use petgraph::{algo::toposort, dot::Dot, prelude::NodeIndex, Graph};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     controlblock::{Block, StepInfo, StepResult},
     io::AnySignal,
-    ControlSystemError,
-    Result
+    ControlSystemError, ParameterStore, Result,
 };
 
 pub struct ControlSystem {
-    #[allow(dead_code)]
+    name: String,
+    #[allow(unused)]
     signals: HashMap<String, AnySignal>,
     blocks: Vec<Box<dyn Block>>,
-    #[allow(dead_code)]
+    #[allow(unused)]
     graph: Graph<String, String>,
+
+    #[allow(unused)]
+    params: ControlSystemParameters,
+
     step: StepInfo,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct ControlSystemParameters {
+    dt: f64,
+}
+
+impl ControlSystemParameters {
+    pub fn new(dt: f64) -> Self {
+        ControlSystemParameters {
+            dt
+        }
+    }
+}
+
 impl ControlSystem {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
     pub fn step(&mut self) -> Result<StepResult> {
         let mut stop = false;
         for b in self.blocks.iter_mut() {
@@ -31,7 +53,7 @@ impl ControlSystem {
 
         if stop {
             Ok(StepResult::Stop)
-        }else{
+        } else {
             Ok(StepResult::Continue)
         }
     }
@@ -76,19 +98,33 @@ impl ControlSystemBuilder {
         Ok(self)
     }
 
-    pub fn build(mut self, dt: f64) -> Result<ControlSystem, ControlSystemError> {
+    pub fn build_from_store(
+        self,
+        name: &str,
+        param_store: &mut ParameterStore,
+        default_params: ControlSystemParameters
+    ) -> Result<ControlSystem, ControlSystemError> {
+        let params = param_store.get_cs_params(default_params)?;
+        self.build(name, params)
+    }
+
+    pub fn build(
+        mut self,
+        name: &str,
+        params: ControlSystemParameters,
+    ) -> Result<ControlSystem, ControlSystemError> {
         for (name, data) in self.blocks.iter_mut() {
             let mut input_signals = data.block.input_signals();
 
             for (signal, input) in data.registered_inputs.iter() {
-                let signal =
-                    self.signals
-                        .get(signal)
-                        .ok_or(ControlSystemError::UnknownSignal {
-                            port: input.clone(),
-                            signal: signal.clone(),
-                            blockname: name.clone()
-                        })?;
+                let signal = self
+                    .signals
+                    .get(signal)
+                    .ok_or(ControlSystemError::UnknownSignal {
+                        port: input.clone(),
+                        signal: signal.clone(),
+                        blockname: name.clone(),
+                    })?;
 
                 **input_signals.get_mut(input).unwrap() = Some(signal.clone());
             }
@@ -107,10 +143,15 @@ impl ControlSystemBuilder {
                     let node = graph.node_weight(node_ix).unwrap();
                     blocks.push(self.blocks.remove(node).unwrap().block);
                 }
+
+                let dt = params.dt;
+
                 Ok(ControlSystem {
+                    name: name.to_string(),
                     signals: self.signals,
                     blocks,
                     graph,
+                    params,
                     step: StepInfo::new(dt),
                 })
             }

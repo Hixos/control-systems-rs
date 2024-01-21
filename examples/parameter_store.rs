@@ -1,6 +1,5 @@
 use std::path::Path;
 
-use config::Config;
 use control_system::ParameterStore;
 use serde::{Deserialize, Serialize};
 
@@ -35,8 +34,8 @@ fn main() {
 
     let mut store = ParameterStore::new(Path::new("test.toml"), "test_cs").unwrap();
 
-    let tc1 = store.get_parameters("block_1", tc1_default).unwrap();
-    let tc2 = store.get_parameters("block_2", tc2_default).unwrap();
+    let tc1 = store.get_block_params("block_1", tc1_default).unwrap();
+    let tc2 = store.get_block_params("block_2", tc2_default).unwrap();
 
     println!("{:?}", tc1);
     println!("{:?}", tc2);

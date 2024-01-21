@@ -6,7 +6,7 @@ pub mod io;
 pub mod numeric;
 
 pub use controlblock::{Block, BlockIO, StepResult, StepInfo};
-pub use controlsystem::{ControlSystem, ControlSystemBuilder};
+pub use controlsystem::{ControlSystem, ControlSystemBuilder, ControlSystemParameters};
 pub use parameters::{ParameterStore, ParameterStoreError};
 
 
@@ -50,6 +50,12 @@ pub enum ControlSystemError {
         signal: String,
         typename: String,
         signal_typename: String,
+    },
+
+    #[error(transparent)]
+    ParameterError {
+        #[from]
+        source: ParameterStoreError
     },
 
     #[error(transparent)]

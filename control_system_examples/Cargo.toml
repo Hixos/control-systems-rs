@@ -16,3 +16,4 @@ rust_data_inspector_signals = { git = "https://github.com/Hixos/rust-data-inspec
 
 nalgebra = "0.32.3"
 anyhow = "1.0.79"
+serde = { version = "1.0.195", features = ["derive"] }
