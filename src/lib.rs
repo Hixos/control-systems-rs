@@ -4,6 +4,7 @@ mod parameters;
 
 pub mod io;
 pub mod numeric;
+pub use control_system_derive::BlockIO;
 
 pub use controlblock::{Block, BlockIO, StepResult, StepInfo};
 pub use controlsystem::{ControlSystem, ControlSystemBuilder, ControlSystemParameters};

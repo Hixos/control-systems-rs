@@ -7,7 +7,6 @@ edition = "2021"
 
 [dependencies]
 control_system = { path = ".." }
-control_system_derive = { path = "../control_system_derive" }
 control_system_blocks = { path = "../control_system_blocks" }
 control_system_plotter = { path = "../control_system_plotter" }
 

@@ -1,6 +1,5 @@
 use control_system::{StepResult, io::Input, Block, ControlSystemError};
 use control_system::{BlockIO, ControlSystemBuilder, StepInfo};
-use control_system_derive::BlockIO;
 use rust_data_inspector_signals::{PlotSignalProducer, PlotSignals};
 
 use crate::Plottable;
