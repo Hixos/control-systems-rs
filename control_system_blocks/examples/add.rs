@@ -1,7 +1,6 @@
 use anyhow::Result;
 use control_system::{ControlSystemBuilder, ControlSystemParameters};
-
-use control_system_blocks::{Add, Constant, Delay, Print};
+use control_system_blocks::{consumers::Print, math::Add, producers::Constant, siso::Delay};
 
 fn main() -> Result<()> {
     let add = Add::<i32, 2>::new("add", [1, 1].into());

@@ -12,8 +12,7 @@ use control_system::{
 };
 use control_system::{BlockIO, ControlSystemBuilder};
 use control_system_blocks::{
-    siso::{PIDParams, PID},
-    Add, Constant, Delay,
+    math::Add, producers::Constant, siso::{Delay, PIDParams, PID}
 };
 use control_system_plotter::add_plotter;
 use nalgebra::Vector2;
@@ -88,7 +87,7 @@ impl Cart {
 fn main() -> Result<()> {
     let (signals_snd, signals_rcv) = channel();
 
-    let handle = spawn(move || run_control_system(signals_snd) );//expect("Error running control system"));
+    let handle = spawn(move || run_control_system(signals_snd)); //expect("Error running control system"));
 
     if let Ok(signals) = signals_rcv.recv() {
         DataInspector::run_native("Cart control system", signals).expect("Error running GUI");
