@@ -88,13 +88,16 @@ impl Cart {
 fn main() -> Result<()> {
     let (signals_snd, signals_rcv) = channel();
 
-    spawn(move || {
-        run_control_system(signals_snd).unwrap();
-    });
+    let handle = spawn(move || run_control_system(signals_snd) );//expect("Error running control system"));
 
-    let signals = signals_rcv.recv().expect("Error receiving signals");
+    if let Ok(signals) = signals_rcv.recv() {
+        DataInspector::run_native("Cart control system", signals).expect("Error running GUI");
+    }
 
-    DataInspector::run_native("Cart control system", signals).expect("Error");
+    let cs_result = handle.join().expect("Thread panicked");
+    if let Err(err) = cs_result {
+        println!("{:?}", err);
+    }
     Ok(())
 }
 
