@@ -1,6 +1,6 @@
 use anyhow::Result;
-use control_system_lib::{ControlSystemBuilder, ControlSystemParameters};
 use control_system_blocks::{consumers::Print, math::Add, producers::Constant, siso::Delay};
+use control_system_lib::{ControlSystemBuilder, ControlSystemParameters, StepResult};
 
 fn main() -> Result<()> {
     let add = Add::<i32, 2>::new("add", [1, 1].into());
@@ -18,11 +18,15 @@ fn main() -> Result<()> {
     builder.add_block(add, &[("u1", "one"), ("u2", "feedback")], &[("y", "sum")])?;
     builder.add_block(print, &[("u", "sum")], &[])?;
 
-    let mut controlsystem = builder.build("adder", ControlSystemParameters::new(1.0))?;
+    let mut controlsystem = builder.build(
+        "adder",
+        ControlSystemParameters {
+            dt: 1.0,
+            max_iter: 10,
+        },
+    )?;
 
-    for _ in 0..10 {
-        controlsystem.step()?;
-    }
+    while controlsystem.step()? != StepResult::Stop {}
 
     Ok(())
 }

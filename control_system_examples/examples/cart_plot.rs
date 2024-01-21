@@ -5,16 +5,18 @@ use std::{
 };
 
 use anyhow::Result;
+use control_system::blocks::add_plotter;
+use control_system::blocks::{
+    math::Add,
+    producers::Constant,
+    siso::{Delay, PIDParams, PID},
+};
 use control_system::{
     io::{Input, Output},
     numeric::ode::{ODESolver, RungeKutta4},
     Block, ControlSystemParameters, ParameterStore, StepInfo, StepResult,
 };
 use control_system::{BlockIO, ControlSystemBuilder};
-use control_system::blocks::{
-    math::Add, producers::Constant, siso::{Delay, PIDParams, PID}
-};
-use control_system::blocks::add_plotter;
 use nalgebra::Vector2;
 use rust_data_inspector::{DataInspector, PlotSignals};
 use serde::{Deserialize, Serialize};
@@ -204,8 +206,14 @@ fn run_control_system(signals_snd: Sender<PlotSignals>) -> Result<()> {
     add_plotter::<f64>("/err/vel", &mut builder, &mut signals)?;
 
     // Build the control system
-    let mut cs =
-        builder.build_from_store("cart", &mut store, ControlSystemParameters::new(0.01))?;
+    let mut cs = builder.build_from_store(
+        "cart",
+        &mut store,
+        ControlSystemParameters {
+            dt: 0.01,
+            max_iter: 1000,
+        },
+    )?;
 
     store.save()?;
 
@@ -215,11 +223,7 @@ fn run_control_system(signals_snd: Sender<PlotSignals>) -> Result<()> {
         .expect("Could not send signals to GUI");
 
     // Execute
-    for _ in 0..1000 {
-        if cs.step()? == StepResult::Stop {
-            break;
-        };
-    }
+    while cs.step()? != StepResult::Stop {}
 
     Ok(())
 }

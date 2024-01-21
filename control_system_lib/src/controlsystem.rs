@@ -22,18 +22,11 @@ pub struct ControlSystem {
 
     step: StepInfo,
 }
-
 #[derive(Serialize, Deserialize)]
 pub struct ControlSystemParameters {
-    dt: f64,
-}
-
-impl ControlSystemParameters {
-    pub fn new(dt: f64) -> Self {
-        ControlSystemParameters {
-            dt
-        }
-    }
+    pub dt: f64,
+    /// Maximum number of iterations. 0 for unlimited
+    pub max_iter: usize, 
 }
 
 impl ControlSystem {
@@ -51,7 +44,7 @@ impl ControlSystem {
         self.step.k += 1;
         self.step.t += self.step.dt;
 
-        if stop {
+        if stop || (self.params.max_iter > 0 && self.step.k > self.params.max_iter) {
             Ok(StepResult::Stop)
         } else {
             Ok(StepResult::Continue)
@@ -102,7 +95,7 @@ impl ControlSystemBuilder {
         self,
         name: &str,
         param_store: &mut ParameterStore,
-        default_params: ControlSystemParameters
+        default_params: ControlSystemParameters,
     ) -> Result<ControlSystem, ControlSystemError> {
         let params = param_store.get_cs_params(default_params)?;
         self.build(name, params)
