@@ -1,5 +1,5 @@
 use anyhow::Result;
-use control_system::{ControlSystemBuilder, ControlSystemParameters};
+use control_system_lib::{ControlSystemBuilder, ControlSystemParameters};
 use control_system_blocks::{consumers::Print, math::Add, producers::Constant, siso::Delay};
 
 fn main() -> Result<()> {

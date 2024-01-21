@@ -1,6 +1,6 @@
 use control_system::{StepResult, io::Input, Block, ControlSystemError};
 use control_system::{BlockIO, ControlSystemBuilder, StepInfo};
-use rust_data_inspector_signals::{PlotSignalProducer, PlotSignals};
+use rust_data_inspector_signals::{PlotSampleSender, PlotSignals};
 
 use crate::Plottable;
 
@@ -12,7 +12,7 @@ pub struct Plotter<T> {
     #[blockio(input)]
     u: Input<T>,
 
-    producers: Vec<PlotSignalProducer>,
+    producers: Vec<PlotSampleSender>,
 }
 
 impl<T: Plottable + Default> Plotter<T> {
@@ -40,7 +40,7 @@ pub fn add_plotter<T>(
     signal_name: &str,
     builder: &mut ControlSystemBuilder,
     signals: &mut PlotSignals,
-) -> control_system::Result<()>
+) -> control_system_lib::Result<()>
 where
     T: Plottable + Default + Clone + 'static,
 {

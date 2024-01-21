@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use control_system::ParameterStore;
+use control_system_lib::ParameterStore;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

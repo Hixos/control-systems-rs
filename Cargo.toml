@@ -5,20 +5,22 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[dependencies]
-petgraph = "0.6.4"
-control_system_derive = { path = "control_system_derive" }
-nalgebra = "0.32.3"
-thiserror = "1.0.56"
-serde = { version = "1.0.195", features = ["derive"] }
-config = "0.13.4"
-toml = "0.8.8"
-
-
 [workspace]
 members = [
+    "control_system_lib",
     "control_system_derive",
     "control_system_blocks",
     "control_system_plotter",
     "control_system_examples",
 ]
+
+[dependencies]
+control_system_lib = { path = "control_system_lib" }
+control_system_derive = { path = "control_system_derive" }
+control_system_blocks = { path = "control_system_blocks", optional = true }
+control_system_plotter = { path = "control_system_plotter", optional = true }
+
+
+[features]
+blocks = ["dep:control_system_blocks"]
+plotter = ["dep:control_system_plotter"]

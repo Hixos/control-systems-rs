@@ -11,13 +11,12 @@ use control_system::{
     Block, ControlSystemParameters, ParameterStore, StepInfo, StepResult,
 };
 use control_system::{BlockIO, ControlSystemBuilder};
-use control_system_blocks::{
+use control_system::blocks::{
     math::Add, producers::Constant, siso::{Delay, PIDParams, PID}
 };
-use control_system_plotter::add_plotter;
+use control_system::blocks::add_plotter;
 use nalgebra::Vector2;
-use rust_data_inspector::datainspector::DataInspector;
-use rust_data_inspector_signals::PlotSignals;
+use rust_data_inspector::{DataInspector, PlotSignals};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
