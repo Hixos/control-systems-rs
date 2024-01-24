@@ -4,12 +4,13 @@ mod parameters;
 
 pub mod io;
 pub mod numeric;
+use std::error::Error;
+
 pub use control_system_derive::BlockIO;
 
-pub use controlblock::{Block, BlockIO, StepResult, StepInfo};
+pub use controlblock::{Block, BlockIO, StepInfo, StepResult};
 pub use controlsystem::{ControlSystem, ControlSystemBuilder, ControlSystemParameters};
 pub use parameters::{ParameterStore, ParameterStoreError};
-
 
 use thiserror::Error;
 
@@ -56,9 +57,15 @@ pub enum ControlSystemError {
     #[error(transparent)]
     ParameterError {
         #[from]
-        source: ParameterStoreError
+        source: ParameterStoreError,
     },
 
     #[error(transparent)]
     Other(#[from] Box<dyn std::error::Error + Send + Sync + 'static>),
+}
+
+impl ControlSystemError {
+    pub fn from_boxed<E: Error + Send + Sync + 'static>(e: E) -> Self {
+        ControlSystemError::Other(Box::new(e) as Box<dyn Error + Send + Sync + 'static>)
+    }
 }
